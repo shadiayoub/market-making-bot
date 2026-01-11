@@ -23,6 +23,9 @@ buy_order_ids = []
 sell_order_ids = []
 SYMBOL = pair  # Use the pair from utils.py
 
+# Track iterations for adaptive pricing (gradual spread narrowing)
+unfilled_iterations = 0  # Count of iterations with unfilled orders
+
 
 def market_making(
     max_order_size,
@@ -32,8 +35,17 @@ def market_making(
     compliance_mode=False,
     compliance_min_usdt=500,
     compliance_max_usdt=1000,
+    enable_adaptive_pricing=True,
+    tightening_rate=0.001,  # Move 0.1% closer per iteration
+    tightening_trigger=2,  # Start tightening after 2 unfilled iterations
+    # Safety features
+    max_spread_pct=30.0,  # Skip trading if spread > 30%
+    max_loss_pct=20.0,  # Stop bot if loss > 20%
+    max_exposure_pct=80.0,  # Limit total exposure to 80% of balance
+    reduce_distance_on_wide_spread=True,  # Reduce max distance when spread > 20%
+    wide_spread_threshold=20.0,  # Spread threshold for distance reduction
 ):
-    global SYMBOL  # Declare global at function level
+    global SYMBOL, unfilled_iterations  # Declare global at function level
     
     print("=" * 60)
     print("Market Making Bot Starting...")
@@ -45,9 +57,14 @@ def market_making(
     else:
         print(f"Number of Positions: {num_orders} (per side)")
         print(f"Order Distance Range: 0.25% - 10% from market price")
-    print(f"Max Order Size: {max_order_size} tokens")
-    print(f"Min Order Size: {min_order_size} tokens")
-    print("=" * 60)
+        print(f"Max Order Size: {max_order_size} tokens")
+        print(f"Min Order Size: {min_order_size} tokens")
+        print(f"Safety Features:")
+        print(f"  - Max Spread: {max_spread_pct}% (skip if exceeded)")
+        print(f"  - Max Loss: {max_loss_pct}% (stop if exceeded)")
+        print(f"  - Max Exposure: {max_exposure_pct}% of balance")
+        print(f"  - Wide Spread Protection: {'Enabled' if reduce_distance_on_wide_spread else 'Disabled'}")
+        print("=" * 60)
     
     try:
         print("\n[INIT] Fetching initial account balance...")
@@ -58,8 +75,28 @@ def market_making(
         initial_token_balance = (
             initial_balance[token_symbol]["free"] + initial_balance[token_symbol]["locked"]
         )
+        
+        # Calculate initial total balance in USDT for loss tracking
+        # We'll need current price to convert tokens to USDT
+        try:
+            initial_order_book = get_order_book(SYMBOL)
+            if initial_order_book and initial_order_book.get("result") in ["true", True]:
+                initial_data = initial_order_book.get("data", {})
+                initial_bid = float(initial_data.get("bidPrice", 0))
+                initial_ask = float(initial_data.get("askPrice", 0))
+                if initial_bid > 0 and initial_ask > 0:
+                    initial_mid_price = (initial_bid + initial_ask) / 2
+                    initial_total_balance_usdt = initial_usdt_balance + (initial_token_balance * initial_mid_price)
+                else:
+                    initial_total_balance_usdt = initial_usdt_balance  # Fallback
+            else:
+                initial_total_balance_usdt = initial_usdt_balance  # Fallback
+        except:
+            initial_total_balance_usdt = initial_usdt_balance  # Fallback if price fetch fails
+        
         print(f"[INIT] Initial USDT Balance: {initial_usdt_balance:.2f} USDT")
         print(f"[INIT] Initial {token_symbol.upper()} Balance: {initial_token_balance:.2f} {token_symbol.upper()}")
+        print(f"[INIT] Initial Total Balance: {initial_total_balance_usdt:.2f} USDT")
         print("\n[INFO] Bot is now running. Press Ctrl+C to stop.\n")
 
         iteration = 0
@@ -133,6 +170,13 @@ def market_making(
 
                     spread_pct = ((ask_price - bid_price) / bid_price) * 100
                     print(f"[MARKET] Bid: {bid_price:.6f} | Ask: {ask_price:.6f} | Spread: {spread_pct:.3f}%")
+                    
+                    # SAFETY FEATURE 1: Spread validation - skip trading if spread too wide
+                    # BUT: In wide spreads, we can still trade to help narrow it (market making mode)
+                    if spread_pct > max_spread_pct:
+                        print(f"[SAFETY] ⚠ Spread very wide ({spread_pct:.2f}% > {max_spread_pct}%)")
+                        print(f"[SAFETY] Continuing to trade to help narrow spread (market making mode)")
+                        # Don't skip - continue trading to provide liquidity and narrow spread
 
                     # Calculate market volatility
                     print("[CALC] Calculating market volatility...")
@@ -166,15 +210,84 @@ def market_making(
                     # best_sell_price = base_sell_price
 
                     # Get the best prices for selling and buying for a low market
-                    best_buy_price = get_buy_price_in_spread()
-                    best_sell_price = get_sell_price_in_spread()
+                    base_best_buy_price = get_buy_price_in_spread()
+                    base_best_sell_price = get_sell_price_in_spread()
                     
                     # Validate sell price is above ask price (critical for sell orders)
-                    if best_sell_price <= 0 or best_sell_price < ask_price:
-                        print(f"[WARNING] best_sell_price ({best_sell_price:.6f}) is invalid or below ask ({ask_price:.6f}), recalculating")
-                        best_sell_price = ask_price * 1.02
+                    if base_best_sell_price <= 0 or base_best_sell_price < ask_price:
+                        print(f"[WARNING] best_sell_price ({base_best_sell_price:.6f}) is invalid or below ask ({ask_price:.6f}), recalculating")
+                        base_best_sell_price = ask_price * 1.02
                     
-                    print(f"[PRICE] Best Buy Price: {best_buy_price:.6f} | Best Sell Price: {best_sell_price:.6f} (Ask: {ask_price:.6f})")
+                    # ADAPTIVE PRICING: Gradually move sell prices down toward bid to drive price down
+                    # Buy orders: Never place higher than current bid
+                    # Sell orders: Gradually move down from ask toward bid
+                    if enable_adaptive_pricing:
+                        # Check if we have unfilled orders (orders exist from previous iteration)
+                        if current_orders_number > 0:
+                            unfilled_iterations += 1
+                        else:
+                            # Orders filled or no orders - reset counter
+                            if unfilled_iterations > 0:
+                                print(f"[ADAPTIVE] Orders filled, resetting tightening counter")
+                            unfilled_iterations = 0
+                        
+                        # BUY ORDERS: Never place higher than current bid (to avoid pushing price up)
+                        # Use bid price as maximum, or slightly below for safety
+                        best_buy_price = min(bid_price * 0.999, base_best_buy_price)  # At or below bid
+                        
+                        # SELL ORDERS: Gradually move down from ask toward bid
+                        # Calculate how far to move down based on iterations
+                        is_wide_spread = spread_pct > wide_spread_threshold
+                        
+                        if is_wide_spread:
+                            # In wide spreads, move more aggressively
+                            # Calculate progress toward bid (0 = at ask, 1 = at bid)
+                            # Start moving immediately in wide spreads
+                            progress_toward_bid = min(
+                                (unfilled_iterations + 1) * tightening_rate * 10,  # Move faster in wide spreads
+                                1.0  # Maximum: reach bid
+                            )
+                        else:
+                            # Normal spreads: wait for trigger, then move gradually
+                            if unfilled_iterations >= tightening_trigger:
+                                progress_toward_bid = min(
+                                    (unfilled_iterations - tightening_trigger + 1) * tightening_rate * 5,
+                                    1.0
+                                )
+                            else:
+                                progress_toward_bid = 0.0
+                        
+                        # Calculate sell price: start at ask, move toward bid
+                        price_range = ask_price - bid_price
+                        best_sell_price = ask_price - (price_range * progress_toward_bid)
+                        
+                        # Ensure sell price is still above bid (don't go below bid)
+                        if best_sell_price <= bid_price:
+                            best_sell_price = bid_price * 1.001  # Minimum 0.1% above bid
+                        
+                        # Ensure sell price is at least above ask initially
+                        if progress_toward_bid == 0.0:
+                            best_sell_price = max(best_sell_price, ask_price * 1.01)  # Start at least 1% above ask
+                        
+                        if is_wide_spread or unfilled_iterations >= tightening_trigger:
+                            print(f"[ADAPTIVE] Driving price down (iteration {unfilled_iterations}):")
+                            print(f"[ADAPTIVE]   Buy: Capped at bid {bid_price:.6f} (using {best_buy_price:.6f})")
+                            print(f"[ADAPTIVE]   Sell: Moving down {progress_toward_bid*100:.1f}% toward bid")
+                            print(f"[ADAPTIVE]   Sell: {base_best_sell_price:.6f} → {best_sell_price:.6f} (target: {bid_price:.6f})")
+                        else:
+                            # Use base prices initially
+                            best_sell_price = base_best_sell_price
+                            if unfilled_iterations > 0:
+                                print(f"[ADAPTIVE] Waiting for {tightening_trigger - unfilled_iterations} more iteration(s) before moving sell prices down")
+                    else:
+                        # No adaptive pricing - use base prices
+                        best_buy_price = base_best_buy_price
+                        best_sell_price = base_best_sell_price
+                        
+                        # Still enforce: buy orders never above bid
+                        best_buy_price = min(bid_price * 0.999, best_buy_price)
+                    
+                    print(f"[PRICE] Best Buy Price: {best_buy_price:.6f} | Best Sell Price: {best_sell_price:.6f} (Ask: {ask_price:.6f}, Bid: {bid_price:.6f})")
 
                     print("[CALC] Calculating order sizes...")
                     
@@ -182,6 +295,24 @@ def market_making(
                     current_balance = fetch_account_balance()
                     available_usdt = current_balance["usdt"]["free"]
                     available_tokens = current_balance[token_symbol]["free"]
+                    
+                    # Calculate current total balance in USDT for loss tracking
+                    mid_price = (bid_price + ask_price) / 2
+                    current_total_balance_usdt = available_usdt + (available_tokens * mid_price)
+                    
+                    # SAFETY FEATURE 2: Maximum loss limit check
+                    if initial_total_balance_usdt > 0:
+                        loss_pct = ((initial_total_balance_usdt - current_total_balance_usdt) / initial_total_balance_usdt) * 100
+                        if loss_pct > max_loss_pct:
+                            print(f"[SAFETY] 🛑 MAXIMUM LOSS REACHED: {loss_pct:.2f}% loss exceeds {max_loss_pct}% limit")
+                            print(f"[SAFETY] Initial Balance: {initial_total_balance_usdt:.2f} USDT")
+                            print(f"[SAFETY] Current Balance: {current_total_balance_usdt:.2f} USDT")
+                            print(f"[SAFETY] Stopping bot to prevent further losses...")
+                            break  # Exit the main loop
+                        elif loss_pct > max_loss_pct * 0.8:  # Warning at 80% of limit
+                            print(f"[SAFETY] ⚠ Warning: Loss at {loss_pct:.2f}% (approaching {max_loss_pct}% limit)")
+                    else:
+                        loss_pct = 0.0
                     
                     # Calculate maximum tokens we can buy with available USDT
                     # Use 95% of available to leave buffer for fees and rounding
@@ -304,9 +435,34 @@ def market_making(
                     
                     total_buy_value = sum(size * best_buy_price for size in buy_order_sizes)
                     total_sell_value = sum(size * best_sell_price for size in sell_order_sizes)
+                    total_exposure = total_buy_value + total_sell_value
+                    
+                    # SAFETY FEATURE 3: Position size cap - limit total exposure
+                    max_exposure_usdt = current_total_balance_usdt * (max_exposure_pct / 100.0)
+                    if total_exposure > max_exposure_usdt:
+                        exposure_scale = max_exposure_usdt / total_exposure
+                        print(f"[SAFETY] ⚠ Total exposure {total_exposure:.2f} USDT exceeds {max_exposure_pct}% limit ({max_exposure_usdt:.2f} USDT)")
+                        print(f"[SAFETY] Scaling down orders by {exposure_scale:.3f} to meet exposure limit")
+                        
+                        # Scale down both buy and sell orders proportionally
+                        buy_order_sizes = [s * exposure_scale for s in buy_order_sizes]
+                        sell_order_sizes = [s * exposure_scale for s in sell_order_sizes]
+                        
+                        # Recalculate values after scaling
+                        total_buy_value = sum(size * best_buy_price for size in buy_order_sizes)
+                        total_sell_value = sum(size * best_sell_price for size in sell_order_sizes)
+                        total_exposure = total_buy_value + total_sell_value
+                        
+                        # Update actual order counts
+                        buy_order_sizes = [s for s in buy_order_sizes if s > 0 and s >= min_order_size]
+                        sell_order_sizes = [s for s in sell_order_sizes if s > 0 and s >= min_order_size]
+                        actual_buy_orders = len(buy_order_sizes)
+                        actual_sell_orders = len(sell_order_sizes)
+                    
                     print(f"[CALC] Available: {available_usdt:.2f} USDT, {available_tokens:.2f} {token_symbol.upper()}")
                     print(f"[CALC] Total Buy Orders: {sum(buy_order_sizes):.2f} {token_symbol.upper()} (~{total_buy_value:.2f} USDT)")
                     print(f"[CALC] Total Sell Orders: {sum(sell_order_sizes):.2f} {token_symbol.upper()} (~{total_sell_value:.2f} USDT)")
+                    print(f"[CALC] Total Exposure: {total_exposure:.2f} USDT ({total_exposure/current_total_balance_usdt*100:.1f}% of balance)")
                     
                     # Final validation: ensure we're not trying to spend more than available
                     if total_buy_value > available_usdt * 0.95:
@@ -322,105 +478,96 @@ def market_making(
                         print(f"[CALC] Recalculated: {actual_buy_orders} buy orders, {total_buy_value:.2f} USDT total")
                     
                     # COMPLIANCE MODE: Adjust order distribution to meet LBank requirement
-                    # Requirement: 500-1000 USDT within ±1% of market price
+                    # Requirement: 500-1000 USDT TOTAL (buy + sell) within ±1% of market price
                     if compliance_mode:
                         # Calculate how many orders fit within ±1% (0.25% steps: 0%, 0.25%, 0.5%, 0.75%, 1.0%)
                         # Orders 0-4 are within ±1% (5 orders total)
                         orders_within_1pct = 5
                         
-                        # Target: concentrate compliance_min_usdt to compliance_max_usdt within ±1%
-                        # Use available balance, but target the compliance range
-                        total_available = available_usdt + (available_tokens * best_sell_price)
-                        target_compliance_value = min(
-                            max(compliance_min_usdt, total_available * 0.85),  # Use 85% of total available
-                            compliance_max_usdt
-                        )
+                        # Target: concentrate compliance_min_usdt to compliance_max_usdt TOTAL within ±1%
+                        target_compliance_value = compliance_max_usdt  # Target the maximum (1000 USDT)
                         
-                        # Calculate how much value we currently have within ±1%
-                        buy_value_within_1pct = sum(
-                            size * best_buy_price 
-                            for i, size in enumerate(buy_order_sizes[:min(orders_within_1pct, len(buy_order_sizes))])
-                        )
-                        sell_value_within_1pct = sum(
-                            size * best_sell_price 
-                            for i, size in enumerate(sell_order_sizes[:min(orders_within_1pct, len(sell_order_sizes))])
-                        )
+                        # Limit to only orders within ±1%
+                        buy_order_sizes_1pct = buy_order_sizes[:min(orders_within_1pct, len(buy_order_sizes))]
+                        sell_order_sizes_1pct = sell_order_sizes[:min(orders_within_1pct, len(sell_order_sizes))]
+                        
+                        # Calculate current value within ±1%
+                        buy_value_within_1pct = sum(size * best_buy_price for size in buy_order_sizes_1pct)
+                        sell_value_within_1pct = sum(size * best_sell_price for size in sell_order_sizes_1pct)
                         total_value_within_1pct = buy_value_within_1pct + sell_value_within_1pct
                         
-                        print(f"[COMPLIANCE] Target: {target_compliance_value:.2f} USDT within ±1%")
+                        print(f"[COMPLIANCE] Target: {target_compliance_value:.2f} USDT TOTAL within ±1%")
                         print(f"[COMPLIANCE] Current within ±1%: {total_value_within_1pct:.2f} USDT (Buy: {buy_value_within_1pct:.2f}, Sell: {sell_value_within_1pct:.2f})")
                         
-                        # Adjust orders to meet compliance - redistribute value to concentrate within ±1%
-                        if total_value_within_1pct < target_compliance_value and total_available >= compliance_min_usdt:
-                            # Need to increase value within ±1%
-                            additional_needed = target_compliance_value - total_value_within_1pct
+                        # If total exceeds max, scale down proportionally
+                        if total_value_within_1pct > compliance_max_usdt:
+                            scale_factor = compliance_max_usdt / total_value_within_1pct
+                            print(f"[COMPLIANCE] Scaling down by {scale_factor:.3f} to meet {compliance_max_usdt} USDT max")
                             
-                            # Split between buy and sell proportionally based on available
-                            buy_ratio = available_usdt / total_available if total_available > 0 else 0.5
-                            sell_ratio = 1 - buy_ratio
+                            # Scale both buy and sell proportionally
+                            buy_order_sizes_1pct = [s * scale_factor for s in buy_order_sizes_1pct]
+                            sell_order_sizes_1pct = [s * scale_factor for s in sell_order_sizes_1pct]
                             
-                            buy_additional = additional_needed * buy_ratio
-                            sell_additional = additional_needed * sell_ratio
+                            buy_value_within_1pct = sum(size * best_buy_price for size in buy_order_sizes_1pct)
+                            sell_value_within_1pct = sum(size * best_sell_price for size in sell_order_sizes_1pct)
+                            total_value_within_1pct = buy_value_within_1pct + sell_value_within_1pct
+                        
+                        # If total is below minimum, try to increase (if balance allows)
+                        elif total_value_within_1pct < compliance_min_usdt:
+                            additional_needed = compliance_min_usdt - total_value_within_1pct
+                            total_available = available_usdt + (available_tokens * best_sell_price)
                             
-                            # Ensure we don't exceed available balance
-                            buy_additional = min(buy_additional, available_usdt * 0.90 - buy_value_within_1pct)
-                            sell_additional = min(sell_additional, (available_tokens * best_sell_price * 0.90) - sell_value_within_1pct)
-                            
-                            # Calculate additional tokens needed for buy orders
-                            if buy_additional > 0 and len(buy_order_sizes) >= orders_within_1pct:
-                                additional_buy_tokens = buy_additional / best_buy_price
+                            if total_available >= compliance_min_usdt:
+                                # Split additional needed proportionally (50/50 buy/sell)
+                                buy_additional = additional_needed * 0.5
+                                sell_additional = additional_needed * 0.5
+                                
+                                # Ensure we don't exceed available balance
+                                buy_additional = min(buy_additional, available_usdt * 0.90 - buy_value_within_1pct)
+                                sell_additional = min(sell_additional, (available_tokens * best_sell_price * 0.90) - sell_value_within_1pct)
+                                
                                 # Distribute additional tokens across orders 0-4
-                                for i in range(min(orders_within_1pct, len(buy_order_sizes))):
-                                    buy_order_sizes[i] += additional_buy_tokens / orders_within_1pct
+                                if buy_additional > 0 and len(buy_order_sizes_1pct) > 0:
+                                    additional_buy_tokens = buy_additional / best_buy_price
+                                    per_order = additional_buy_tokens / len(buy_order_sizes_1pct)
+                                    buy_order_sizes_1pct = [s + per_order for s in buy_order_sizes_1pct]
+                                
+                                if sell_additional > 0 and len(sell_order_sizes_1pct) > 0:
+                                    additional_sell_tokens = sell_additional / best_sell_price
+                                    per_order = additional_sell_tokens / len(sell_order_sizes_1pct)
+                                    sell_order_sizes_1pct = [s + per_order for s in sell_order_sizes_1pct]
+                                
+                                if buy_additional > 0 or sell_additional > 0:
+                                    print(f"[COMPLIANCE] Increased orders within ±1% (+{buy_additional:.2f} buy, +{sell_additional:.2f} sell)")
                             
-                            # Calculate additional tokens needed for sell orders
-                            if sell_additional > 0 and len(sell_order_sizes) >= orders_within_1pct:
-                                additional_sell_tokens = sell_additional / best_sell_price
-                                # Distribute additional tokens across orders 0-4
-                                for i in range(min(orders_within_1pct, len(sell_order_sizes))):
-                                    sell_order_sizes[i] += additional_sell_tokens / orders_within_1pct
-                            
-                            if buy_additional > 0 or sell_additional > 0:
-                                print(f"[COMPLIANCE] Adjusted orders within ±1% (+{buy_additional:.2f} buy, +{sell_additional:.2f} sell)")
+                            # Recalculate after adjustment
+                            buy_value_within_1pct = sum(size * best_buy_price for size in buy_order_sizes_1pct)
+                            sell_value_within_1pct = sum(size * best_sell_price for size in sell_order_sizes_1pct)
+                            total_value_within_1pct = buy_value_within_1pct + sell_value_within_1pct
                         
-                        # Limit orders beyond ±1% to minimal size (or remove them)
-                        # In compliance mode, we focus on ±1% only
-                        if len(buy_order_sizes) > orders_within_1pct:
-                            # Truncate to only orders within ±1%
-                            buy_order_sizes = buy_order_sizes[:orders_within_1pct]
-                            print(f"[COMPLIANCE] Limited buy orders to {orders_within_1pct} (within ±1%)")
+                        # Replace order sizes with compliance-adjusted sizes
+                        buy_order_sizes = buy_order_sizes_1pct
+                        sell_order_sizes = sell_order_sizes_1pct
                         
-                        if len(sell_order_sizes) > orders_within_1pct:
-                            # Truncate to only orders within ±1%
-                            sell_order_sizes = sell_order_sizes[:orders_within_1pct]
-                            print(f"[COMPLIANCE] Limited sell orders to {orders_within_1pct} (within ±1%)")
-                        
-                        # Recalculate actual orders after compliance adjustments
+                        # Filter out orders that don't meet minimums
                         buy_order_sizes = [s for s in buy_order_sizes if s > 0 and s >= min_order_size]
                         sell_order_sizes = [s for s in sell_order_sizes if s > 0 and s >= min_order_size]
                         actual_buy_orders = len(buy_order_sizes)
                         actual_sell_orders = len(sell_order_sizes)
                         
                         # Final compliance check
-                        final_buy_value_1pct = sum(
-                            size * best_buy_price 
-                            for i, size in enumerate(buy_order_sizes[:min(orders_within_1pct, len(buy_order_sizes))])
-                        )
-                        final_sell_value_1pct = sum(
-                            size * best_sell_price 
-                            for i, size in enumerate(sell_order_sizes[:min(orders_within_1pct, len(sell_order_sizes))])
-                        )
+                        final_buy_value_1pct = sum(size * best_buy_price for size in buy_order_sizes)
+                        final_sell_value_1pct = sum(size * best_sell_price for size in sell_order_sizes)
                         final_total_1pct = final_buy_value_1pct + final_sell_value_1pct
-                        print(f"[COMPLIANCE] Final value within ±1%: {final_total_1pct:.2f} USDT")
                         
-                        if final_total_1pct >= compliance_min_usdt:
-                            print(f"[COMPLIANCE] ✓ Requirement met: {final_total_1pct:.2f} USDT >= {compliance_min_usdt} USDT")
+                        print(f"[COMPLIANCE] Final value within ±1%: {final_total_1pct:.2f} USDT (Buy: {final_buy_value_1pct:.2f}, Sell: {final_sell_value_1pct:.2f})")
+                        
+                        if compliance_min_usdt <= final_total_1pct <= compliance_max_usdt:
+                            print(f"[COMPLIANCE] ✓ Requirement met: {final_total_1pct:.2f} USDT is within {compliance_min_usdt}-{compliance_max_usdt} USDT range")
+                        elif final_total_1pct < compliance_min_usdt:
+                            print(f"[COMPLIANCE] ⚠ Warning: {final_total_1pct:.2f} USDT < {compliance_min_usdt} USDT (insufficient balance)")
                         else:
-                            print(f"[COMPLIANCE] ⚠ Warning: {final_total_1pct:.2f} USDT < {compliance_min_usdt} USDT")
-                            if total_available < compliance_min_usdt:
-                                print(f"[COMPLIANCE]   Insufficient balance: {total_available:.2f} USDT available, need {compliance_min_usdt} USDT")
-                            else:
-                                print(f"[COMPLIANCE]   Adjusting order distribution to maximize within ±1%")
+                            print(f"[COMPLIANCE] ⚠ Warning: {final_total_1pct:.2f} USDT > {compliance_max_usdt} USDT (scaled but still high)")
 
                     # Clear order ID lists for new orders
                     buy_order_ids.clear()
@@ -543,8 +690,15 @@ def market_making(
                                 # Ensure minimum 0.25% distance for first order after base
                                 if i == 1 and cumulative_sell_step < 0.0025:
                                     cumulative_sell_step = 0.0025
-                                # In compliance mode, cap at 1% instead of 10%
-                                max_distance = 0.01 if compliance_mode else 0.10
+                                # SAFETY FEATURE 4: Dynamic distance adjustment for wide spreads
+                                if compliance_mode:
+                                    max_distance = 0.01  # 1% in compliance mode
+                                elif reduce_distance_on_wide_spread and spread_pct > wide_spread_threshold:
+                                    # Reduce max distance to 5% when spread > 20%
+                                    max_distance = 0.05
+                                else:
+                                    max_distance = 0.10  # Default 10%
+                                
                                 if cumulative_sell_step > max_distance:
                                     cumulative_sell_step = max_distance
                                 # Use best_sell_price (which is above ask) as base
