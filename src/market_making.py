@@ -190,10 +190,21 @@ def market_making(
                     base_sell_price = ask_price * (1 + spread)
                     print(f"[PRICE] Base Buy Price: {base_buy_price:.6f} | Base Sell Price: {base_sell_price:.6f}")
 
-                    # Check if there are existing orders and cancel them
+                    # Check if there are existing orders BEFORE cancelling (for adaptive pricing tracking)
                     print("[ORDERS] Checking existing orders...")
                     current_orders_number = get_num_of_orders(SYMBOL)
                     print(f"[ORDERS] Found {current_orders_number} existing orders")
+                    
+                    # Track unfilled orders for adaptive pricing BEFORE cancelling
+                    if enable_adaptive_pricing:
+                        if current_orders_number > 0:
+                            unfilled_iterations += 1
+                            print(f"[ADAPTIVE] Unfilled orders detected, iteration count: {unfilled_iterations}")
+                        else:
+                            # Orders filled or no orders - reset counter
+                            if unfilled_iterations > 0:
+                                print(f"[ADAPTIVE] Orders filled or none exist, resetting tightening counter")
+                            unfilled_iterations = 0
                     
                     # Always cancel all orders to start fresh each iteration
                     # This prevents order accumulation and ensures clean state
@@ -222,15 +233,6 @@ def market_making(
                     # Buy orders: Never place higher than current bid
                     # Sell orders: Gradually move down from ask toward bid
                     if enable_adaptive_pricing:
-                        # Check if we have unfilled orders (orders exist from previous iteration)
-                        if current_orders_number > 0:
-                            unfilled_iterations += 1
-                        else:
-                            # Orders filled or no orders - reset counter
-                            if unfilled_iterations > 0:
-                                print(f"[ADAPTIVE] Orders filled, resetting tightening counter")
-                            unfilled_iterations = 0
-                        
                         # BUY ORDERS: Never place higher than current bid (to avoid pushing price up)
                         # Use bid price as maximum, or slightly below for safety
                         best_buy_price = min(bid_price * 0.999, base_best_buy_price)  # At or below bid
@@ -242,7 +244,7 @@ def market_making(
                         if is_wide_spread:
                             # In wide spreads, move more aggressively
                             # Calculate progress toward bid (0 = at ask, 1 = at bid)
-                            # Start moving immediately in wide spreads
+                            # Start moving immediately in wide spreads (unfilled_iterations already tracked above)
                             progress_toward_bid = min(
                                 (unfilled_iterations + 1) * tightening_rate * 10,  # Move faster in wide spreads
                                 1.0  # Maximum: reach bid
@@ -259,21 +261,37 @@ def market_making(
                         
                         # Calculate sell price: start at ask, move toward bid
                         price_range = ask_price - bid_price
-                        best_sell_price = ask_price - (price_range * progress_toward_bid)
+                        target_sell_price = ask_price - (price_range * progress_toward_bid)
                         
-                        # Ensure sell price is still above bid (don't go below bid)
+                        # Strategy: Start above ask, then gradually move down
+                        # Phase 1: Stay above ask (progress 0-10%) - provide liquidity above market
+                        # Phase 2: Move toward ask (progress 10-50%) - narrow the gap
+                        # Phase 3: Move toward bid (progress 50-100%) - drive price down
+                        
+                        if progress_toward_bid < 0.10:  # First 10%: Stay above ask
+                            # Start at ask + premium, gradually reduce premium
+                            premium = 0.02 * (1 - progress_toward_bid / 0.10)  # 2% down to 0% premium
+                            best_sell_price = ask_price * (1 + premium)
+                        elif progress_toward_bid < 0.50:  # 10-50%: Move from ask toward mid
+                            # Move from ask toward mid-price
+                            mid_progress = (progress_toward_bid - 0.10) / 0.40  # 0 to 1 within this phase
+                            mid_price = (bid_price + ask_price) / 2
+                            best_sell_price = ask_price - ((ask_price - mid_price) * mid_progress)
+                        else:  # 50-100%: Move from mid toward bid
+                            # Move from mid-price toward bid
+                            bid_progress = (progress_toward_bid - 0.50) / 0.50  # 0 to 1 within this phase
+                            mid_price = (bid_price + ask_price) / 2
+                            best_sell_price = mid_price - ((mid_price - bid_price) * bid_progress)
+                        
+                        # Safety: Ensure sell price is always above bid
                         if best_sell_price <= bid_price:
                             best_sell_price = bid_price * 1.001  # Minimum 0.1% above bid
                         
-                        # Ensure sell price is at least above ask initially
-                        if progress_toward_bid == 0.0:
-                            best_sell_price = max(best_sell_price, ask_price * 1.01)  # Start at least 1% above ask
-                        
-                        if is_wide_spread or unfilled_iterations >= tightening_trigger:
-                            print(f"[ADAPTIVE] Driving price down (iteration {unfilled_iterations}):")
+                        if is_wide_spread or (unfilled_iterations >= tightening_trigger and progress_toward_bid > 0):
+                            print(f"[ADAPTIVE] Driving price down (unfilled iterations: {unfilled_iterations}):")
                             print(f"[ADAPTIVE]   Buy: Capped at bid {bid_price:.6f} (using {best_buy_price:.6f})")
-                            print(f"[ADAPTIVE]   Sell: Moving down {progress_toward_bid*100:.1f}% toward bid")
-                            print(f"[ADAPTIVE]   Sell: {base_best_sell_price:.6f} → {best_sell_price:.6f} (target: {bid_price:.6f})")
+                            print(f"[ADAPTIVE]   Sell: Progress {progress_toward_bid*100:.2f}% toward bid")
+                            print(f"[ADAPTIVE]   Sell: {base_best_sell_price:.6f} → {best_sell_price:.6f} (target: {bid_price:.6f}, ask: {ask_price:.6f})")
                         else:
                             # Use base prices initially
                             best_sell_price = base_best_sell_price
