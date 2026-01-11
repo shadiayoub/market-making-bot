@@ -3,8 +3,28 @@ from src.market_making import market_making
 
 if __name__ == "__main__":
     try:
-
-        market_making()
+        # Parameters for market making bot:
+        # - Total amount: 500 USDT
+        # - Number of positions: 20
+        # - Order distance: 0.25% - 10% from market price
+        # 
+        # Order size calculation:
+        # - Average per position: 500 USDT / 20 = 25 USDT
+        # - First order (30%): ~150 USDT worth
+        # - Remaining orders: ~350 USDT total
+        # Note: max_order_size and min_order_size are in token amounts
+        # The function will adjust based on available balance and current price
+        
+        # Set max_order_size to allow for ~150-200 USDT per order (adjust based on token price)
+        # Set min_order_size to ensure orders aren't too small
+        # Note: With 104.50 USDT, we can buy ~145 tokens at 0.2475, so min_order_size of 100
+        # means we can only place 1 order. Lowering to allow more orders.
+        market_making(
+            max_order_size=10000,  # Maximum order size in tokens (will be capped by available balance)
+            min_order_size=10,     # Minimum order size in tokens (lowered to allow more orders with limited balance)
+            num_orders=20,         # Number of positions
+            base_price_step_percentage=0.0025,  # Base step: 0.25% (orders will range from 0.25% to 10%)
+        )
 
     except KeyboardInterrupt:
         print("Main process interrupted")

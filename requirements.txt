@@ -1,3 +1,4 @@
 lbank-connector-python==1.0.133
 numpy==1.26.4
 requests==2.31.0
+python-dotenv==1.0.0

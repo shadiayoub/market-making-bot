@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  market-making-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: lbank-market-making-bot
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      # Mount .env file (optional, if you want to edit it without rebuilding)
+      - ./.env:/app/.env:ro
+    # Keep container running
+    stdin_open: true
+    tty: true
