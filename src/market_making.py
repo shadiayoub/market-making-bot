@@ -29,6 +29,9 @@ def market_making(
     min_order_size,
     num_orders=20,
     base_price_step_percentage=0.0025,
+    compliance_mode=False,
+    compliance_min_usdt=500,
+    compliance_max_usdt=1000,
 ):
     global SYMBOL  # Declare global at function level
     
@@ -36,8 +39,12 @@ def market_making(
     print("Market Making Bot Starting...")
     print(f"Trading Pair: {SYMBOL}")
     print(f"Token Symbol: {token_symbol}")
-    print(f"Number of Positions: {num_orders} (per side)")
-    print(f"Order Distance Range: 0.25% - 10% from market price")
+    if compliance_mode:
+        print(f"Compliance Mode: ENABLED (LBank requirement: {compliance_min_usdt}-{compliance_max_usdt} USDT within ±1%)")
+        print(f"Number of Positions: Concentrated within ±1% range")
+    else:
+        print(f"Number of Positions: {num_orders} (per side)")
+        print(f"Order Distance Range: 0.25% - 10% from market price")
     print(f"Max Order Size: {max_order_size} tokens")
     print(f"Min Order Size: {min_order_size} tokens")
     print("=" * 60)
@@ -314,6 +321,107 @@ def market_making(
                         total_buy_value = sum(size * best_buy_price for size in buy_order_sizes)
                         print(f"[CALC] Recalculated: {actual_buy_orders} buy orders, {total_buy_value:.2f} USDT total")
                     
+                    # COMPLIANCE MODE: Adjust order distribution to meet LBank requirement
+                    # Requirement: 500-1000 USDT within ±1% of market price
+                    if compliance_mode:
+                        # Calculate how many orders fit within ±1% (0.25% steps: 0%, 0.25%, 0.5%, 0.75%, 1.0%)
+                        # Orders 0-4 are within ±1% (5 orders total)
+                        orders_within_1pct = 5
+                        
+                        # Target: concentrate compliance_min_usdt to compliance_max_usdt within ±1%
+                        # Use available balance, but target the compliance range
+                        total_available = available_usdt + (available_tokens * best_sell_price)
+                        target_compliance_value = min(
+                            max(compliance_min_usdt, total_available * 0.85),  # Use 85% of total available
+                            compliance_max_usdt
+                        )
+                        
+                        # Calculate how much value we currently have within ±1%
+                        buy_value_within_1pct = sum(
+                            size * best_buy_price 
+                            for i, size in enumerate(buy_order_sizes[:min(orders_within_1pct, len(buy_order_sizes))])
+                        )
+                        sell_value_within_1pct = sum(
+                            size * best_sell_price 
+                            for i, size in enumerate(sell_order_sizes[:min(orders_within_1pct, len(sell_order_sizes))])
+                        )
+                        total_value_within_1pct = buy_value_within_1pct + sell_value_within_1pct
+                        
+                        print(f"[COMPLIANCE] Target: {target_compliance_value:.2f} USDT within ±1%")
+                        print(f"[COMPLIANCE] Current within ±1%: {total_value_within_1pct:.2f} USDT (Buy: {buy_value_within_1pct:.2f}, Sell: {sell_value_within_1pct:.2f})")
+                        
+                        # Adjust orders to meet compliance - redistribute value to concentrate within ±1%
+                        if total_value_within_1pct < target_compliance_value and total_available >= compliance_min_usdt:
+                            # Need to increase value within ±1%
+                            additional_needed = target_compliance_value - total_value_within_1pct
+                            
+                            # Split between buy and sell proportionally based on available
+                            buy_ratio = available_usdt / total_available if total_available > 0 else 0.5
+                            sell_ratio = 1 - buy_ratio
+                            
+                            buy_additional = additional_needed * buy_ratio
+                            sell_additional = additional_needed * sell_ratio
+                            
+                            # Ensure we don't exceed available balance
+                            buy_additional = min(buy_additional, available_usdt * 0.90 - buy_value_within_1pct)
+                            sell_additional = min(sell_additional, (available_tokens * best_sell_price * 0.90) - sell_value_within_1pct)
+                            
+                            # Calculate additional tokens needed for buy orders
+                            if buy_additional > 0 and len(buy_order_sizes) >= orders_within_1pct:
+                                additional_buy_tokens = buy_additional / best_buy_price
+                                # Distribute additional tokens across orders 0-4
+                                for i in range(min(orders_within_1pct, len(buy_order_sizes))):
+                                    buy_order_sizes[i] += additional_buy_tokens / orders_within_1pct
+                            
+                            # Calculate additional tokens needed for sell orders
+                            if sell_additional > 0 and len(sell_order_sizes) >= orders_within_1pct:
+                                additional_sell_tokens = sell_additional / best_sell_price
+                                # Distribute additional tokens across orders 0-4
+                                for i in range(min(orders_within_1pct, len(sell_order_sizes))):
+                                    sell_order_sizes[i] += additional_sell_tokens / orders_within_1pct
+                            
+                            if buy_additional > 0 or sell_additional > 0:
+                                print(f"[COMPLIANCE] Adjusted orders within ±1% (+{buy_additional:.2f} buy, +{sell_additional:.2f} sell)")
+                        
+                        # Limit orders beyond ±1% to minimal size (or remove them)
+                        # In compliance mode, we focus on ±1% only
+                        if len(buy_order_sizes) > orders_within_1pct:
+                            # Truncate to only orders within ±1%
+                            buy_order_sizes = buy_order_sizes[:orders_within_1pct]
+                            print(f"[COMPLIANCE] Limited buy orders to {orders_within_1pct} (within ±1%)")
+                        
+                        if len(sell_order_sizes) > orders_within_1pct:
+                            # Truncate to only orders within ±1%
+                            sell_order_sizes = sell_order_sizes[:orders_within_1pct]
+                            print(f"[COMPLIANCE] Limited sell orders to {orders_within_1pct} (within ±1%)")
+                        
+                        # Recalculate actual orders after compliance adjustments
+                        buy_order_sizes = [s for s in buy_order_sizes if s > 0 and s >= min_order_size]
+                        sell_order_sizes = [s for s in sell_order_sizes if s > 0 and s >= min_order_size]
+                        actual_buy_orders = len(buy_order_sizes)
+                        actual_sell_orders = len(sell_order_sizes)
+                        
+                        # Final compliance check
+                        final_buy_value_1pct = sum(
+                            size * best_buy_price 
+                            for i, size in enumerate(buy_order_sizes[:min(orders_within_1pct, len(buy_order_sizes))])
+                        )
+                        final_sell_value_1pct = sum(
+                            size * best_sell_price 
+                            for i, size in enumerate(sell_order_sizes[:min(orders_within_1pct, len(sell_order_sizes))])
+                        )
+                        final_total_1pct = final_buy_value_1pct + final_sell_value_1pct
+                        print(f"[COMPLIANCE] Final value within ±1%: {final_total_1pct:.2f} USDT")
+                        
+                        if final_total_1pct >= compliance_min_usdt:
+                            print(f"[COMPLIANCE] ✓ Requirement met: {final_total_1pct:.2f} USDT >= {compliance_min_usdt} USDT")
+                        else:
+                            print(f"[COMPLIANCE] ⚠ Warning: {final_total_1pct:.2f} USDT < {compliance_min_usdt} USDT")
+                            if total_available < compliance_min_usdt:
+                                print(f"[COMPLIANCE]   Insufficient balance: {total_available:.2f} USDT available, need {compliance_min_usdt} USDT")
+                            else:
+                                print(f"[COMPLIANCE]   Adjusting order distribution to maximize within ±1%")
+
                     # Clear order ID lists for new orders
                     buy_order_ids.clear()
                     sell_order_ids.clear()
@@ -352,9 +460,10 @@ def market_making(
                                 # Ensure minimum 0.25% distance for first order after base
                                 if i == 1 and cumulative_buy_step < 0.0025:
                                     cumulative_buy_step = 0.0025
-                                # Cap at 10% maximum distance
-                                if cumulative_buy_step > 0.10:
-                                    cumulative_buy_step = 0.10
+                                # In compliance mode, cap at 1% instead of 10%
+                                max_distance = 0.01 if compliance_mode else 0.10
+                                if cumulative_buy_step > max_distance:
+                                    cumulative_buy_step = max_distance
                                 buy_price = best_buy_price * (1 - cumulative_buy_step)
 
                             distance_pct = (cumulative_buy_step * 100) if i > 0 else 0
@@ -434,9 +543,10 @@ def market_making(
                                 # Ensure minimum 0.25% distance for first order after base
                                 if i == 1 and cumulative_sell_step < 0.0025:
                                     cumulative_sell_step = 0.0025
-                                # Cap at 10% maximum distance
-                                if cumulative_sell_step > 0.10:
-                                    cumulative_sell_step = 0.10
+                                # In compliance mode, cap at 1% instead of 10%
+                                max_distance = 0.01 if compliance_mode else 0.10
+                                if cumulative_sell_step > max_distance:
+                                    cumulative_sell_step = max_distance
                                 # Use best_sell_price (which is above ask) as base
                                 sell_price = best_sell_price * (1 + cumulative_sell_step)
                             
