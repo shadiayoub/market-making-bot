@@ -1,4 +1,4 @@
-./agent.sh
+agent.sh
 
 # Environment variables
 .env

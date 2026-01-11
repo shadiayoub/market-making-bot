@@ -207,9 +207,28 @@ def market_making(
                         else:
                             effective_min_buy = 0
 
-                    buy_order_sizes = calculate_order_sizes(
-                        buy_total_order_size, num_orders, effective_min_buy
+                    # Calculate how many orders we can realistically place with available USDT
+                    # Target: each order should be at least 5 USDT value
+                    MIN_ORDER_VALUE = 5.0
+                    min_tokens_per_order = MIN_ORDER_VALUE / best_buy_price
+                    max_realistic_orders = min(
+                        num_orders,
+                        int((available_usdt * 0.95) / MIN_ORDER_VALUE),
+                        int(buy_total_order_size / max(min_tokens_per_order, effective_min_buy))
                     )
+                    
+                    # If we can't place many orders, reduce the target to ensure quality
+                    if max_realistic_orders < num_orders * 0.5:
+                        # Create fewer, larger orders that will definitely meet minimums
+                        target_orders = max(1, max_realistic_orders)
+                        print(f"[INFO] Adjusting to {target_orders} buy orders to ensure all meet {MIN_ORDER_VALUE} USDT minimum")
+                        buy_order_sizes = calculate_order_sizes(
+                            buy_total_order_size, target_orders, max(min_tokens_per_order, effective_min_buy)
+                        )
+                    else:
+                        buy_order_sizes = calculate_order_sizes(
+                            buy_total_order_size, num_orders, effective_min_buy
+                        )
                     
                     # Final safety check: ensure total value doesn't exceed available USDT
                     if len(buy_order_sizes) > 0:
@@ -219,6 +238,9 @@ def market_making(
                             scale_factor = (available_usdt * 0.95) / total_buy_value_check
                             buy_order_sizes = [size * scale_factor for size in buy_order_sizes]
                             print(f"[WARNING] Scaled down buy orders by {scale_factor:.3f} to fit available USDT")
+                            
+                            # After scaling, we'll filter based on order value in the validation step below
+                            # Don't filter here - let the value-based check handle it
 
                     sell_total_order_size = calculate_order_size(
                         "sell",
@@ -241,30 +263,37 @@ def market_making(
                     buy_order_sizes = [s for s in buy_order_sizes if s > 0]
                     sell_order_sizes = [s for s in sell_order_sizes if s > 0]
                     
-                    # For buy orders, if total is below minimum, we may have a single order below minimum
-                    # Check minimum order value instead (price * quantity >= 1 USDT typically)
-                    if len(buy_order_sizes) > 0 and buy_order_sizes[0] < min_order_size:
-                        # Check if order value meets minimum (1 USDT)
-                        order_value = buy_order_sizes[0] * best_buy_price
-                        if order_value >= 1.0:
-                            print(f"[INFO] Buy order size {buy_order_sizes[0]:.2f} is below token minimum {min_order_size}, but order value {order_value:.2f} USDT meets minimum")
-                        else:
-                            print(f"[WARNING] Buy order value {order_value:.2f} USDT is below 1.0 USDT minimum. Skipping buy orders.")
-                            buy_order_sizes = []
+                    # For buy orders: filter based on minimum order value (5 USDT for safety) and minimum size
+                    # Exchange seems to require higher minimums than 1 USDT
+                    MIN_ORDER_VALUE = 5.0  # Minimum order value in USDT
+                    filtered_buy_sizes = []
+                    for size in buy_order_sizes:
+                        order_value = size * best_buy_price
+                        # Accept if order value >= MIN_ORDER_VALUE AND size >= min_order_size
+                        # Be more strict to avoid exchange rejections
+                        if order_value >= MIN_ORDER_VALUE and size >= min_order_size:
+                            filtered_buy_sizes.append(size)
+                    buy_order_sizes = filtered_buy_sizes
                     
-                    # Ensure sell orders meet minimum
-                    sell_order_sizes = [s for s in sell_order_sizes if s >= min_order_size]
+                    # For sell orders: filter based on minimum order value AND minimum size
+                    filtered_sell_sizes = []
+                    for size in sell_order_sizes:
+                        order_value = size * best_sell_price
+                        # Accept if order value >= MIN_ORDER_VALUE AND size >= min_order_size
+                        if order_value >= MIN_ORDER_VALUE and size >= min_order_size:
+                            filtered_sell_sizes.append(size)
+                    sell_order_sizes = filtered_sell_sizes
                     
                     # Adjust num_orders to actual number of orders we can place
                     actual_buy_orders = len(buy_order_sizes)
                     actual_sell_orders = len(sell_order_sizes)
                     if actual_buy_orders < num_orders or actual_sell_orders < num_orders:
-                        print(f"[INFO] Adjusted order count: {actual_buy_orders} buy orders, {actual_sell_orders} sell orders (due to minimum size requirements)")
+                        print(f"[INFO] Adjusted order count: {actual_buy_orders} buy orders, {actual_sell_orders} sell orders (due to minimum size/value requirements)")
                     
                     if actual_buy_orders == 0:
-                        print(f"[WARNING] Cannot place any buy orders - total size {buy_total_order_size:.2f} is below minimum {min_order_size} per order")
+                        print(f"[WARNING] Cannot place any buy orders - orders don't meet minimum value (5 USDT) and size ({min_order_size}) requirements")
                     if actual_sell_orders == 0:
-                        print(f"[WARNING] Cannot place any sell orders - total size {sell_total_order_size:.2f} is below minimum {min_order_size} per order")
+                        print(f"[WARNING] Cannot place any sell orders - orders don't meet minimum value (5 USDT) and size ({min_order_size}) requirements")
                     
                     total_buy_value = sum(size * best_buy_price for size in buy_order_sizes)
                     total_sell_value = sum(size * best_sell_price for size in sell_order_sizes)
@@ -330,19 +359,21 @@ def market_making(
 
                             distance_pct = (cumulative_buy_step * 100) if i > 0 else 0
                             
-                            # Skip if order size is too small
-                            if i >= len(buy_order_sizes) or buy_order_sizes[i] < min_order_size:
+                            # Skip if index out of range
+                            if i >= len(buy_order_sizes):
                                 buy_failed += 1
                                 if i < 3:
-                                    print(f"  [BUY #{i+1}] SKIPPED: Order size too small or not available")
+                                    print(f"  [BUY #{i+1}] SKIPPED: Order not available (index out of range)")
                                 continue
                             
-                            # Check minimum order value (price * quantity)
+                            # Check minimum order value (price * quantity >= 5 USDT) and minimum size
+                            # Exchange requires higher minimums - be strict here
+                            MIN_ORDER_VALUE = 5.0
                             order_value = buy_order_sizes[i] * buy_price
-                            if order_value < 1.0:  # Minimum order value is typically 1 USDT
+                            if order_value < MIN_ORDER_VALUE or buy_order_sizes[i] < min_order_size:
                                 buy_failed += 1
                                 if i < 3:
-                                    print(f"  [BUY #{i+1}] SKIPPED: Order value {order_value:.2f} USDT below minimum 1.0 USDT")
+                                    print(f"  [BUY #{i+1}] SKIPPED: Order value {order_value:.2f} USDT < {MIN_ORDER_VALUE} or size {buy_order_sizes[i]:.2f} < {min_order_size}")
                                 continue
                             
                             res = place_order(
@@ -414,19 +445,21 @@ def market_making(
                                 print(f"[WARNING] Sell price {sell_price:.6f} below ask {ask_price:.6f}, adjusting")
                                 sell_price = ask_price * 1.02
                             
-                            # Skip if order size is too small
-                            if i >= len(sell_order_sizes) or sell_order_sizes[i] < min_order_size:
+                            # Skip if index out of range
+                            if i >= len(sell_order_sizes):
                                 sell_failed += 1
                                 if i < 3:
-                                    print(f"  [SELL #{i+1}] SKIPPED: Order size too small or not available")
+                                    print(f"  [SELL #{i+1}] SKIPPED: Order not available (index out of range)")
                                 continue
                             
-                            # Check minimum order value (price * quantity)
+                            # Check minimum order value (price * quantity >= 5 USDT) and minimum size
+                            # Exchange requires higher minimums - be strict here
+                            MIN_ORDER_VALUE = 5.0
                             order_value = sell_order_sizes[i] * sell_price
-                            if order_value < 1.0:  # Minimum order value is typically 1 USDT
+                            if order_value < MIN_ORDER_VALUE or sell_order_sizes[i] < min_order_size:
                                 sell_failed += 1
                                 if i < 3:
-                                    print(f"  [SELL #{i+1}] SKIPPED: Order value {order_value:.2f} USDT below minimum 1.0 USDT")
+                                    print(f"  [SELL #{i+1}] SKIPPED: Order value {order_value:.2f} USDT < {MIN_ORDER_VALUE} or size {sell_order_sizes[i]:.2f} < {min_order_size}")
                                 continue
                             
                             distance_pct = (cumulative_sell_step * 100) if i > 0 else 0
