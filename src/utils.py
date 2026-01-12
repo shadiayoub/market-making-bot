@@ -54,10 +54,10 @@ def get_order_book(symbol):
 
 def get_buy_price_in_spread():
     """
-    Get buy price within spread (2% below ask price).
+    Get buy price within spread (should be below bid price, not ask price).
     
     Returns:
-    - float: Buy price, or 0.0 on error
+    - float: Buy price (below bid), or 0.0 on error
     """
     try:
         order_book = get_order_book(pair)
@@ -75,19 +75,22 @@ def get_buy_price_in_spread():
         if not data:
             raise Exception("No data in order book response")
         
-        ask_price = float(data.get("askPrice", 0))
-        if ask_price == 0:
-            raise Exception("Invalid ask price")
+        # Get BID price (what buyers are willing to pay)
+        bid_price = float(data.get("bidPrice", 0))
+        if bid_price == 0:
+            raise Exception("Invalid bid price")
         
-        # Calculate the maximum allowable ask price based on a 2% spread
-        max_ask_price = ask_price * 0.98
-        return max_ask_price
+        # For buy orders, we should be BELOW the bid price (what buyers are asking)
+        # Place at 0.1% below bid to ensure we're below market and get maker fee
+        buy_price = bid_price * 0.999
+        return buy_price
     except Exception as e:
         print(f"[WARNING] Error in get_buy_price_in_spread: {e}")
         # Try to get current price as fallback
         try:
             current_price = get_current_price(pair)
-            fallback_price = current_price * 0.98
+            # Use 0.1% below current price as fallback
+            fallback_price = current_price * 0.999
             print(f"[FALLBACK] Using current price fallback: {fallback_price:.6f}")
             return fallback_price
         except:

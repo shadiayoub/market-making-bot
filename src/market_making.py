@@ -275,8 +275,14 @@ def market_making(
                     # best_sell_price = base_sell_price
 
                     # Get the best prices for selling and buying for a low market
-                    base_best_buy_price = get_buy_price_in_spread()
+                    base_best_buy_price = get_buy_price_in_spread()  # This should already be below bid
                     base_best_sell_price = get_sell_price_in_spread()
+                    
+                    # CRITICAL: Ensure buy price NEVER exceeds bid price
+                    # Buy orders must be below bid to be maker orders and not push price up
+                    if base_best_buy_price > bid_price:
+                        print(f"[WARNING] base_best_buy_price ({base_best_buy_price:.6f}) exceeds bid ({bid_price:.6f}), capping at bid")
+                        base_best_buy_price = bid_price * 0.999
                     
                     # Validate sell price is above ask price (critical for sell orders)
                     if base_best_sell_price <= 0 or base_best_sell_price < ask_price:
@@ -290,6 +296,11 @@ def market_making(
                         # BUY ORDERS: Never place higher than current bid (to avoid pushing price up)
                         # Use bid price as maximum, or slightly below for safety
                         best_buy_price = min(bid_price * 0.999, base_best_buy_price)  # At or below bid
+                        
+                        # Double-check: ensure it's never above bid
+                        if best_buy_price > bid_price:
+                            print(f"[ERROR] best_buy_price ({best_buy_price:.6f}) exceeds bid ({bid_price:.6f}), forcing to bid * 0.999")
+                            best_buy_price = bid_price * 0.999
                         
                         # SELL ORDERS: Gradually move down from ask toward bid
                         # Calculate how far to move down based on iterations
@@ -356,8 +367,10 @@ def market_making(
                         best_buy_price = base_best_buy_price
                         best_sell_price = base_best_sell_price
                         
-                        # Still enforce: buy orders never above bid
-                        best_buy_price = min(bid_price * 0.999, best_buy_price)
+                        # CRITICAL: Still ensure buy price doesn't exceed bid
+                        if best_buy_price > bid_price:
+                            print(f"[WARNING] best_buy_price ({best_buy_price:.6f}) exceeds bid ({bid_price:.6f}), capping at bid * 0.999")
+                            best_buy_price = bid_price * 0.999
                     
                     print(f"[PRICE] Best Buy Price: {best_buy_price:.6f} | Best Sell Price: {best_sell_price:.6f} (Ask: {ask_price:.6f}, Bid: {bid_price:.6f})")
 
@@ -674,12 +687,17 @@ def market_making(
                         # BUY Orders
                         if not usdt_pause and i < actual_buy_orders:
                             if token_pause:
-                                best_buy_price = get_buy_price_in_spread()
+                                temp_buy_price = get_buy_price_in_spread()
                             else:
-                                best_buy_price = base_buy_price
+                                temp_buy_price = best_buy_price  # Use the already-capped best_buy_price from above
+                            
+                            # CRITICAL: Ensure buy price NEVER exceeds bid price
+                            if temp_buy_price > bid_price:
+                                print(f"[WARNING] Buy price ({temp_buy_price:.6f}) exceeds bid ({bid_price:.6f}), capping")
+                                temp_buy_price = bid_price * 0.999
 
                             if i == 0:
-                                buy_price = best_buy_price
+                                buy_price = temp_buy_price
                                 cumulative_buy_step = 0
                             else:
                                 # Accumulate the step percentage
@@ -691,7 +709,12 @@ def market_making(
                                 max_distance = 0.01 if compliance_mode else 0.10
                                 if cumulative_buy_step > max_distance:
                                     cumulative_buy_step = max_distance
-                                buy_price = best_buy_price * (1 - cumulative_buy_step)
+                                buy_price = temp_buy_price * (1 - cumulative_buy_step)
+                            
+                            # FINAL CHECK: Ensure buy_price never exceeds bid
+                            if buy_price > bid_price:
+                                print(f"[ERROR] Calculated buy_price ({buy_price:.6f}) exceeds bid ({bid_price:.6f}), forcing to bid * 0.999")
+                                buy_price = bid_price * 0.999
 
                             distance_pct = (cumulative_buy_step * 100) if i > 0 else 0
                             
