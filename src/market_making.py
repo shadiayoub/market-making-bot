@@ -12,6 +12,7 @@ from src.utils import (
     fetch_account_balance,
     calculate_percentage_change,
     get_num_of_orders,
+    get_current_orders,
     get_order_book,
     get_buy_price_in_spread,
     get_sell_price_in_spread,
@@ -46,6 +47,10 @@ def market_making(
     wide_spread_threshold=20.0,  # Spread threshold for distance reduction
 ):
     global SYMBOL, unfilled_iterations  # Declare global at function level
+    
+    # HARDCODED MAX BUY PRICE: 0.22 USDT
+    # All buy orders will be capped at this price, and any existing buy orders above this will be cancelled
+    MAX_BUY_PRICE = 0.22
     
     print("=" * 60)
     print("Market Making Bot Starting...")
@@ -204,11 +209,13 @@ def market_making(
                     print(f"[ORDERS] Found {current_orders_number} existing orders")
                     
                     # Check order status to detect filled orders BEFORE cancelling
+                    # Also check for buy orders above MAX_BUY_PRICE to cancel them
                     filled_buy_value = 0.0
                     filled_sell_value = 0.0
                     filled_buy_qty = 0.0
                     filled_sell_qty = 0.0
                     cancelled_orders = 0
+                    buy_orders_above_limit = []  # Store order IDs to cancel
                     
                     if current_orders_number > 0:
                         try:
@@ -224,6 +231,7 @@ def market_making(
                                         price = float(order.get("price", 0) or 0)
                                         trade_type = order.get("tradeType", "").lower()
                                         status = order.get("status", 0)
+                                        order_id = order.get("orderId") or order.get("order_id")
                                         
                                         # Check if order was filled (executedQty > 0 or status indicates fill)
                                         if executed_qty > 0:
@@ -234,8 +242,19 @@ def market_making(
                                                 filled_sell_qty += executed_qty
                                                 filled_sell_value += executed_qty * price
                                         elif orig_qty > 0:
+                                            # Check if this is a buy order above MAX_BUY_PRICE
+                                            if "buy" in trade_type and price > MAX_BUY_PRICE:
+                                                if order_id:
+                                                    buy_orders_above_limit.append(order_id)
+                                                    print(f"[MAX_PRICE] Found buy order above {MAX_BUY_PRICE}: Order ID {order_id}, Price: {price:.6f}")
                                             # Order exists but not filled - will be cancelled
                                             cancelled_orders += 1
+                            
+                            # Cancel buy orders above MAX_BUY_PRICE
+                            if buy_orders_above_limit:
+                                print(f"[MAX_PRICE] Cancelling {len(buy_orders_above_limit)} buy orders above {MAX_BUY_PRICE} USDT...")
+                                cancel_result = cancel_list_of_orders(SYMBOL, buy_orders_above_limit)
+                                print(f"[MAX_PRICE] Cancelled buy orders above {MAX_BUY_PRICE} USDT")
                             
                             if filled_buy_qty > 0 or filled_sell_qty > 0:
                                 print(f"[FILLED] ⚠ Orders filled this iteration:")
@@ -284,6 +303,11 @@ def market_making(
                         print(f"[WARNING] base_best_buy_price ({base_best_buy_price:.6f}) exceeds bid ({bid_price:.6f}), capping at bid")
                         base_best_buy_price = bid_price * 0.999
                     
+                    # CRITICAL: Ensure buy price NEVER exceeds MAX_BUY_PRICE (0.22)
+                    if base_best_buy_price > MAX_BUY_PRICE:
+                        print(f"[MAX_PRICE] base_best_buy_price ({base_best_buy_price:.6f}) exceeds MAX_BUY_PRICE ({MAX_BUY_PRICE:.6f}), capping at {MAX_BUY_PRICE}")
+                        base_best_buy_price = MAX_BUY_PRICE
+                    
                     # Validate sell price is above ask price (critical for sell orders)
                     if base_best_sell_price <= 0 or base_best_sell_price < ask_price:
                         print(f"[WARNING] best_sell_price ({base_best_sell_price:.6f}) is invalid or below ask ({ask_price:.6f}), recalculating")
@@ -293,14 +317,19 @@ def market_making(
                     # Buy orders: Never place higher than current bid
                     # Sell orders: Gradually move down from ask toward bid
                     if enable_adaptive_pricing:
-                        # BUY ORDERS: Never place higher than current bid (to avoid pushing price up)
-                        # Use bid price as maximum, or slightly below for safety
-                        best_buy_price = min(bid_price * 0.999, base_best_buy_price)  # At or below bid
+                        # BUY ORDERS: Never place higher than current bid OR MAX_BUY_PRICE
+                        # Use the minimum of: bid, MAX_BUY_PRICE, and calculated price
+                        best_buy_price = min(bid_price * 0.999, MAX_BUY_PRICE, base_best_buy_price)
                         
                         # Double-check: ensure it's never above bid
                         if best_buy_price > bid_price:
                             print(f"[ERROR] best_buy_price ({best_buy_price:.6f}) exceeds bid ({bid_price:.6f}), forcing to bid * 0.999")
                             best_buy_price = bid_price * 0.999
+                        
+                        # Double-check: ensure it's never above MAX_BUY_PRICE
+                        if best_buy_price > MAX_BUY_PRICE:
+                            print(f"[MAX_PRICE] best_buy_price ({best_buy_price:.6f}) exceeds MAX_BUY_PRICE ({MAX_BUY_PRICE:.6f}), forcing to {MAX_BUY_PRICE}")
+                            best_buy_price = MAX_BUY_PRICE
                         
                         # SELL ORDERS: Gradually move down from ask toward bid
                         # Calculate how far to move down based on iterations
@@ -371,6 +400,11 @@ def market_making(
                         if best_buy_price > bid_price:
                             print(f"[WARNING] best_buy_price ({best_buy_price:.6f}) exceeds bid ({bid_price:.6f}), capping at bid * 0.999")
                             best_buy_price = bid_price * 0.999
+                        
+                        # CRITICAL: Still ensure buy price doesn't exceed MAX_BUY_PRICE
+                        if best_buy_price > MAX_BUY_PRICE:
+                            print(f"[MAX_PRICE] best_buy_price ({best_buy_price:.6f}) exceeds MAX_BUY_PRICE ({MAX_BUY_PRICE:.6f}), capping at {MAX_BUY_PRICE}")
+                            best_buy_price = MAX_BUY_PRICE
                     
                     print(f"[PRICE] Best Buy Price: {best_buy_price:.6f} | Best Sell Price: {best_sell_price:.6f} (Ask: {ask_price:.6f}, Bid: {bid_price:.6f})")
 
@@ -695,6 +729,11 @@ def market_making(
                             if temp_buy_price > bid_price:
                                 print(f"[WARNING] Buy price ({temp_buy_price:.6f}) exceeds bid ({bid_price:.6f}), capping")
                                 temp_buy_price = bid_price * 0.999
+                            
+                            # CRITICAL: Ensure buy price NEVER exceeds MAX_BUY_PRICE
+                            if temp_buy_price > MAX_BUY_PRICE:
+                                print(f"[MAX_PRICE] Buy price ({temp_buy_price:.6f}) exceeds MAX_BUY_PRICE ({MAX_BUY_PRICE:.6f}), capping")
+                                temp_buy_price = MAX_BUY_PRICE
 
                             if i == 0:
                                 buy_price = temp_buy_price
@@ -715,6 +754,11 @@ def market_making(
                             if buy_price > bid_price:
                                 print(f"[ERROR] Calculated buy_price ({buy_price:.6f}) exceeds bid ({bid_price:.6f}), forcing to bid * 0.999")
                                 buy_price = bid_price * 0.999
+                            
+                            # FINAL CHECK: Ensure buy_price never exceeds MAX_BUY_PRICE
+                            if buy_price > MAX_BUY_PRICE:
+                                print(f"[MAX_PRICE] Calculated buy_price ({buy_price:.6f}) exceeds MAX_BUY_PRICE ({MAX_BUY_PRICE:.6f}), forcing to {MAX_BUY_PRICE}")
+                                buy_price = MAX_BUY_PRICE
 
                             distance_pct = (cumulative_buy_step * 100) if i > 0 else 0
                             
