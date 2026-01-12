@@ -428,21 +428,30 @@ def calculate_order_size(
     return order_size
 
 
-def get_dynamic_sleep_time(volatility):
+def get_dynamic_sleep_time(volatility, base_sleep_time=None, max_sleep_time=None, min_sleep_time=None):
     """
     Get dynamic sleep time based on market volatility.
 
     Parameters:
     - volatility: Current market volatility
+    - base_sleep_time: Base sleep time in seconds (default: 8, or from env)
+    - max_sleep_time: Maximum sleep time in seconds (default: 20, or from env)
+    - min_sleep_time: Minimum sleep time in seconds (default: 1, or from env)
 
     Returns:
     - int: Dynamic sleep time in seconds
     """
-
-    # Initialize parameters
-    base_sleep_time = 8  # Base sleep time in seconds
-    max_sleep_time = 20  # Maximum sleep time in seconds
-    min_sleep_time = 1  # Minimum sleep time in seconds
+    import os
+    from dotenv import load_dotenv
+    load_dotenv()
+    
+    # Get from environment variables with defaults
+    if base_sleep_time is None:
+        base_sleep_time = float(os.getenv("BASE_SLEEP_TIME", "8"))
+    if max_sleep_time is None:
+        max_sleep_time = float(os.getenv("MAX_SLEEP_TIME", "20"))
+    if min_sleep_time is None:
+        min_sleep_time = float(os.getenv("MIN_SLEEP_TIME", "1"))
 
     # Adjust sleep time based on volatility
     if volatility > 0.05:  # High volatility threshold
