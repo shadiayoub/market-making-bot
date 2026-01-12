@@ -45,12 +45,18 @@ def market_making(
     max_exposure_pct=80.0,  # Limit total exposure to 80% of balance
     reduce_distance_on_wide_spread=True,  # Reduce max distance when spread > 20%
     wide_spread_threshold=20.0,  # Spread threshold for distance reduction
+    max_buy_price=None,  # Maximum buy price limit (None or 0 to disable)
 ):
     global SYMBOL, unfilled_iterations  # Declare global at function level
     
-    # HARDCODED MAX BUY PRICE: 0.22 USDT
+    # MAX BUY PRICE: Configurable limit (None means disabled)
     # All buy orders will be capped at this price, and any existing buy orders above this will be cancelled
-    MAX_BUY_PRICE = 0.22
+    MAX_BUY_PRICE = max_buy_price if max_buy_price and max_buy_price > 0 else None
+    
+    if MAX_BUY_PRICE:
+        print(f"[MAX_BUY_PRICE] Maximum buy price limit: {MAX_BUY_PRICE:.6f} USDT")
+    else:
+        print("[MAX_BUY_PRICE] Maximum buy price limit: DISABLED")
     
     print("=" * 60)
     print("Market Making Bot Starting...")
@@ -242,16 +248,16 @@ def market_making(
                                                 filled_sell_qty += executed_qty
                                                 filled_sell_value += executed_qty * price
                                         elif orig_qty > 0:
-                                            # Check if this is a buy order above MAX_BUY_PRICE
-                                            if "buy" in trade_type and price > MAX_BUY_PRICE:
+                                            # Check if this is a buy order above MAX_BUY_PRICE (if enabled)
+                                            if MAX_BUY_PRICE and "buy" in trade_type and price > MAX_BUY_PRICE:
                                                 if order_id:
                                                     buy_orders_above_limit.append(order_id)
                                                     print(f"[MAX_PRICE] Found buy order above {MAX_BUY_PRICE}: Order ID {order_id}, Price: {price:.6f}")
                                             # Order exists but not filled - will be cancelled
                                             cancelled_orders += 1
                             
-                            # Cancel buy orders above MAX_BUY_PRICE
-                            if buy_orders_above_limit:
+                            # Cancel buy orders above MAX_BUY_PRICE (if enabled)
+                            if MAX_BUY_PRICE and buy_orders_above_limit:
                                 print(f"[MAX_PRICE] Cancelling {len(buy_orders_above_limit)} buy orders above {MAX_BUY_PRICE} USDT...")
                                 cancel_result = cancel_list_of_orders(SYMBOL, buy_orders_above_limit)
                                 print(f"[MAX_PRICE] Cancelled buy orders above {MAX_BUY_PRICE} USDT")
@@ -303,8 +309,8 @@ def market_making(
                         print(f"[WARNING] base_best_buy_price ({base_best_buy_price:.6f}) exceeds bid ({bid_price:.6f}), capping at bid")
                         base_best_buy_price = bid_price * 0.999
                     
-                    # CRITICAL: Ensure buy price NEVER exceeds MAX_BUY_PRICE (0.22)
-                    if base_best_buy_price > MAX_BUY_PRICE:
+                    # CRITICAL: Ensure buy price NEVER exceeds MAX_BUY_PRICE (if enabled)
+                    if MAX_BUY_PRICE and base_best_buy_price > MAX_BUY_PRICE:
                         print(f"[MAX_PRICE] base_best_buy_price ({base_best_buy_price:.6f}) exceeds MAX_BUY_PRICE ({MAX_BUY_PRICE:.6f}), capping at {MAX_BUY_PRICE}")
                         base_best_buy_price = MAX_BUY_PRICE
                     
@@ -317,17 +323,20 @@ def market_making(
                     # Buy orders: Never place higher than current bid
                     # Sell orders: Gradually move down from ask toward bid
                     if enable_adaptive_pricing:
-                        # BUY ORDERS: Never place higher than current bid OR MAX_BUY_PRICE
-                        # Use the minimum of: bid, MAX_BUY_PRICE, and calculated price
-                        best_buy_price = min(bid_price * 0.999, MAX_BUY_PRICE, base_best_buy_price)
+                        # BUY ORDERS: Never place higher than current bid (and MAX_BUY_PRICE if enabled)
+                        # Use the minimum of: bid, MAX_BUY_PRICE (if set), and calculated price
+                        price_limits = [bid_price * 0.999, base_best_buy_price]
+                        if MAX_BUY_PRICE:
+                            price_limits.append(MAX_BUY_PRICE)
+                        best_buy_price = min(price_limits)
                         
                         # Double-check: ensure it's never above bid
                         if best_buy_price > bid_price:
                             print(f"[ERROR] best_buy_price ({best_buy_price:.6f}) exceeds bid ({bid_price:.6f}), forcing to bid * 0.999")
                             best_buy_price = bid_price * 0.999
                         
-                        # Double-check: ensure it's never above MAX_BUY_PRICE
-                        if best_buy_price > MAX_BUY_PRICE:
+                        # Double-check: ensure it's never above MAX_BUY_PRICE (if enabled)
+                        if MAX_BUY_PRICE and best_buy_price > MAX_BUY_PRICE:
                             print(f"[MAX_PRICE] best_buy_price ({best_buy_price:.6f}) exceeds MAX_BUY_PRICE ({MAX_BUY_PRICE:.6f}), forcing to {MAX_BUY_PRICE}")
                             best_buy_price = MAX_BUY_PRICE
                         
@@ -401,8 +410,8 @@ def market_making(
                             print(f"[WARNING] best_buy_price ({best_buy_price:.6f}) exceeds bid ({bid_price:.6f}), capping at bid * 0.999")
                             best_buy_price = bid_price * 0.999
                         
-                        # CRITICAL: Still ensure buy price doesn't exceed MAX_BUY_PRICE
-                        if best_buy_price > MAX_BUY_PRICE:
+                        # CRITICAL: Still ensure buy price doesn't exceed MAX_BUY_PRICE (if enabled)
+                        if MAX_BUY_PRICE and best_buy_price > MAX_BUY_PRICE:
                             print(f"[MAX_PRICE] best_buy_price ({best_buy_price:.6f}) exceeds MAX_BUY_PRICE ({MAX_BUY_PRICE:.6f}), capping at {MAX_BUY_PRICE}")
                             best_buy_price = MAX_BUY_PRICE
                     
@@ -730,8 +739,8 @@ def market_making(
                                 print(f"[WARNING] Buy price ({temp_buy_price:.6f}) exceeds bid ({bid_price:.6f}), capping")
                                 temp_buy_price = bid_price * 0.999
                             
-                            # CRITICAL: Ensure buy price NEVER exceeds MAX_BUY_PRICE
-                            if temp_buy_price > MAX_BUY_PRICE:
+                            # CRITICAL: Ensure buy price NEVER exceeds MAX_BUY_PRICE (if enabled)
+                            if MAX_BUY_PRICE and temp_buy_price > MAX_BUY_PRICE:
                                 print(f"[MAX_PRICE] Buy price ({temp_buy_price:.6f}) exceeds MAX_BUY_PRICE ({MAX_BUY_PRICE:.6f}), capping")
                                 temp_buy_price = MAX_BUY_PRICE
 
@@ -755,8 +764,8 @@ def market_making(
                                 print(f"[ERROR] Calculated buy_price ({buy_price:.6f}) exceeds bid ({bid_price:.6f}), forcing to bid * 0.999")
                                 buy_price = bid_price * 0.999
                             
-                            # FINAL CHECK: Ensure buy_price never exceeds MAX_BUY_PRICE
-                            if buy_price > MAX_BUY_PRICE:
+                            # FINAL CHECK: Ensure buy_price never exceeds MAX_BUY_PRICE (if enabled)
+                            if MAX_BUY_PRICE and buy_price > MAX_BUY_PRICE:
                                 print(f"[MAX_PRICE] Calculated buy_price ({buy_price:.6f}) exceeds MAX_BUY_PRICE ({MAX_BUY_PRICE:.6f}), forcing to {MAX_BUY_PRICE}")
                                 buy_price = MAX_BUY_PRICE
 

@@ -41,6 +41,10 @@ if __name__ == "__main__":
         TIGHTENING_RATE = float(os.getenv("TIGHTENING_RATE", "0.001"))
         TIGHTENING_TRIGGER = int(os.getenv("TIGHTENING_TRIGGER", "2"))
         
+        # Read max buy price from environment (optional - set to 0 or empty to disable)
+        MAX_BUY_PRICE_STR = os.getenv("MAX_BUY_PRICE", "").strip()
+        MAX_BUY_PRICE = float(MAX_BUY_PRICE_STR) if MAX_BUY_PRICE_STR and float(MAX_BUY_PRICE_STR) > 0 else None
+        
         market_making(
             max_order_size=10000,  # Maximum order size in tokens (will be capped by available balance)
             min_order_size=10,     # Minimum order size in tokens (lowered to allow more orders with limited balance)
@@ -58,6 +62,7 @@ if __name__ == "__main__":
             max_exposure_pct=MAX_EXPOSURE_PCT,  # Limit total exposure to this % of balance
             reduce_distance_on_wide_spread=REDUCE_DISTANCE_ON_WIDE_SPREAD,  # Reduce max distance when spread is wide
             wide_spread_threshold=WIDE_SPREAD_THRESHOLD,  # Spread threshold for distance reduction
+            max_buy_price=MAX_BUY_PRICE,  # Maximum buy price limit (None to disable)
         )
 
     except KeyboardInterrupt:
