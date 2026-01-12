@@ -113,18 +113,26 @@ def market_making(
                     continue
 
                 balance = fetch_account_balance()
-                usdt_balance = balance["usdt"]["free"] + balance["usdt"]["locked"]
-                token_balance = balance[token_symbol]["free"] + balance[token_symbol]["locked"]
+                usdt_free = balance["usdt"]["free"]
+                usdt_locked = balance["usdt"]["locked"]
+                usdt_total = usdt_free + usdt_locked
+                token_free = balance[token_symbol]["free"]
+                token_locked = balance[token_symbol]["locked"]
+                token_total = token_free + token_locked
 
                 usdt_change = calculate_percentage_change(
-                    initial_usdt_balance, usdt_balance
+                    initial_usdt_balance, usdt_total
                 )
                 token_change = calculate_percentage_change(
-                    initial_token_balance, token_balance
+                    initial_token_balance, token_total
                 )
                 
-                print(f"[BALANCE] USDT: {usdt_balance:.2f} USDT (Change: {usdt_change:+.2f}%)")
-                print(f"[BALANCE] {token_symbol.upper()}: {token_balance:.2f} {token_symbol.upper()} (Change: {token_change:+.2f}%)")
+                print(f"[BALANCE] USDT: {usdt_free:.2f} free, {usdt_locked:.2f} locked, {usdt_total:.2f} total (Change: {usdt_change:+.2f}%)")
+                print(f"[BALANCE] {token_symbol.upper()}: {token_free:.2f} free, {token_locked:.2f} locked, {token_total:.2f} total (Change: {token_change:+.2f}%)")
+                
+                # Warn if USDT is decreasing significantly
+                if usdt_change < -1.0:  # More than 1% decrease
+                    print(f"[WARNING] ⚠ USDT balance decreased by {abs(usdt_change):.2f}% - check if buy orders are filling without matching sells")
 
                 # Initialize pause flags
                 usdt_pause = False
@@ -195,9 +203,53 @@ def market_making(
                     current_orders_number = get_num_of_orders(SYMBOL)
                     print(f"[ORDERS] Found {current_orders_number} existing orders")
                     
+                    # Check order status to detect filled orders BEFORE cancelling
+                    filled_buy_value = 0.0
+                    filled_sell_value = 0.0
+                    filled_buy_qty = 0.0
+                    filled_sell_qty = 0.0
+                    cancelled_orders = 0
+                    
+                    if current_orders_number > 0:
+                        try:
+                            orders_response = get_current_orders(SYMBOL)
+                            if orders_response and (orders_response.get("result") == "true" or orders_response.get("result") is True):
+                                data = orders_response.get("data", {})
+                                orders = data.get("orders", []) if isinstance(data, dict) else []
+                                
+                                for order in orders:
+                                    if isinstance(order, dict):
+                                        executed_qty = float(order.get("executedQty", 0) or 0)
+                                        orig_qty = float(order.get("origQty", 0) or 0)
+                                        price = float(order.get("price", 0) or 0)
+                                        trade_type = order.get("tradeType", "").lower()
+                                        status = order.get("status", 0)
+                                        
+                                        # Check if order was filled (executedQty > 0 or status indicates fill)
+                                        if executed_qty > 0:
+                                            if "buy" in trade_type:
+                                                filled_buy_qty += executed_qty
+                                                filled_buy_value += executed_qty * price
+                                            elif "sell" in trade_type:
+                                                filled_sell_qty += executed_qty
+                                                filled_sell_value += executed_qty * price
+                                        elif orig_qty > 0:
+                                            # Order exists but not filled - will be cancelled
+                                            cancelled_orders += 1
+                            
+                            if filled_buy_qty > 0 or filled_sell_qty > 0:
+                                print(f"[FILLED] ⚠ Orders filled this iteration:")
+                                if filled_buy_qty > 0:
+                                    print(f"[FILLED]   Buy: {filled_buy_qty:.2f} tokens (~{filled_buy_value:.2f} USDT)")
+                                if filled_sell_qty > 0:
+                                    print(f"[FILLED]   Sell: {filled_sell_qty:.2f} tokens (~{filled_sell_value:.2f} USDT)")
+                                print(f"[FILLED]   Net USDT change: {filled_sell_value - filled_buy_value:.2f} USDT")
+                        except Exception as e:
+                            print(f"[WARNING] Could not check order fill status: {e}")
+                    
                     # Track unfilled orders for adaptive pricing BEFORE cancelling
                     if enable_adaptive_pricing:
-                        if current_orders_number > 0:
+                        if current_orders_number > 0 and cancelled_orders > 0:
                             unfilled_iterations += 1
                             print(f"[ADAPTIVE] Unfilled orders detected, iteration count: {unfilled_iterations}")
                         else:
@@ -213,6 +265,8 @@ def market_making(
                         cancel_all_orders(SYMBOL)
                         sell_order_ids.clear()
                         buy_order_ids.clear()
+                        if cancelled_orders > 0:
+                            print(f"[CANCEL] Cancelled {cancelled_orders} unfilled orders")
                         print("[CANCEL] All orders cancelled")
 
                     # best_prices = get_best_price()
@@ -309,10 +363,18 @@ def market_making(
 
                     print("[CALC] Calculating order sizes...")
                     
-                    # Get current balances for validation
-                    current_balance = fetch_account_balance()
-                    available_usdt = current_balance["usdt"]["free"]
-                    available_tokens = current_balance[token_symbol]["free"]
+                    # Get current balances for validation (BEFORE placing orders)
+                    balance_before_orders = fetch_account_balance()
+                    available_usdt = balance_before_orders["usdt"]["free"]
+                    available_tokens = balance_before_orders[token_symbol]["free"]
+                    usdt_locked_before = balance_before_orders["usdt"]["locked"]
+                    token_locked_before = balance_before_orders[token_symbol]["locked"]
+                    
+                    # Track balance before placing orders for comparison
+                    total_usdt_before = available_usdt + usdt_locked_before
+                    total_tokens_before = available_tokens + token_locked_before
+                    
+                    current_balance = balance_before_orders
                     
                     # Calculate current total balance in USDT for loss tracking
                     mid_price = (bid_price + ask_price) / 2
@@ -791,6 +853,34 @@ def market_making(
                     
                     print(f"\n[SUMMARY] Buy Orders: {buy_placed} placed, {buy_failed} failed | Sell Orders: {sell_placed} placed, {sell_failed} failed")
                     print(f"[SUMMARY] Total Active Orders: {len(buy_order_ids) + len(sell_order_ids)}")
+                    
+                    # Check balance AFTER placing orders to detect any changes
+                    balance_after_orders = fetch_account_balance()
+                    usdt_free_after = balance_after_orders["usdt"]["free"]
+                    usdt_locked_after = balance_after_orders["usdt"]["locked"]
+                    usdt_total_after = usdt_free_after + usdt_locked_after
+                    token_free_after = balance_after_orders[token_symbol]["free"]
+                    token_locked_after = balance_after_orders[token_symbol]["locked"]
+                    token_total_after = token_free_after + token_locked_after
+                    
+                    # Calculate changes
+                    usdt_change_this_iter = usdt_total_after - total_usdt_before
+                    token_change_this_iter = token_total_after - total_tokens_before
+                    
+                    # Show locked funds in orders
+                    if usdt_locked_after > 0 or token_locked_after > 0:
+                        print(f"[BALANCE] After orders: USDT {usdt_free_after:.2f} free + {usdt_locked_after:.2f} locked = {usdt_total_after:.2f} total")
+                        print(f"[BALANCE] After orders: {token_symbol.upper()} {token_free_after:.2f} free + {token_locked_after:.2f} locked = {token_total_after:.2f} total")
+                    
+                    # Warn if USDT decreased significantly (likely from filled buy orders)
+                    if usdt_change_this_iter < -0.1:  # More than 0.1 USDT decrease
+                        print(f"[WARNING] ⚠ USDT decreased by {abs(usdt_change_this_iter):.2f} USDT this iteration!")
+                        print(f"[WARNING] This likely means buy orders filled (consuming USDT) without matching sell fills")
+                        print(f"[WARNING] Check if sell orders are too far from market price to fill")
+                    
+                    # Track if tokens increased (from filled buy orders)
+                    if token_change_this_iter > 0.1:
+                        print(f"[INFO] Tokens increased by {token_change_this_iter:.2f} (likely from filled buy orders)")
 
                     sleep_time = get_dynamic_sleep_time(current_volatility)
                     print(f"\n[WAIT] Sleeping for {sleep_time:.1f} seconds before next iteration...")
