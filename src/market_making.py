@@ -384,27 +384,45 @@ def market_making(
                         total_buy_value = sum(order_values_usdt)
                         total_sell_value = sum(order_values_usdt)
                         
+                        buy_scale = 1.0
+                        sell_scale = 1.0
+                        
                         if total_buy_value > available_usdt * 0.95:
-                            scale = (available_usdt * 0.95) / total_buy_value
-                            buy_order_sizes = [s * scale for s in buy_order_sizes]
-                            print(f"[REFERENCE_PRICE] Scaled down buy orders by {scale:.3f} to fit available USDT")
+                            buy_scale = (available_usdt * 0.95) / total_buy_value
+                            buy_order_sizes = [s * buy_scale for s in buy_order_sizes]
+                            # Also scale the order values
+                            order_values_usdt_buy = [v * buy_scale for v in order_values_usdt]
+                            print(f"[REFERENCE_PRICE] Scaled down buy orders by {buy_scale:.3f} to fit available USDT")
+                        else:
+                            order_values_usdt_buy = order_values_usdt.copy()
                         
                         if total_sell_value > (available_tokens * best_sell_price * 0.95):
-                            scale = (available_tokens * best_sell_price * 0.95) / total_sell_value
-                            sell_order_sizes = [s * scale for s in sell_order_sizes]
-                            print(f"[REFERENCE_PRICE] Scaled down sell orders by {scale:.3f} to fit available tokens")
+                            sell_scale = (available_tokens * best_sell_price * 0.95) / total_sell_value
+                            sell_order_sizes = [s * sell_scale for s in sell_order_sizes]
+                            # Also scale the order values
+                            order_values_usdt_sell = [v * sell_scale for v in order_values_usdt]
+                            print(f"[REFERENCE_PRICE] Scaled down sell orders by {sell_scale:.3f} to fit available tokens")
+                        else:
+                            order_values_usdt_sell = order_values_usdt.copy()
                         
                         # Filter orders that meet minimum size/value requirements
                         MIN_ORDER_VALUE = 10.0  # Client requirement: ≥ 10 USDT
                         filtered_buy = []
                         filtered_sell = []
-                        for i, (size, price, value) in enumerate(zip(buy_order_sizes, buy_prices, order_values_usdt)):
-                            if size * price >= MIN_ORDER_VALUE and size >= min_order_size:
-                                filtered_buy.append((i, size, price, value))
                         
-                        for i, (size, price, value) in enumerate(zip(sell_order_sizes, sell_prices, order_values_usdt)):
-                            if size * price >= MIN_ORDER_VALUE and size >= min_order_size:
-                                filtered_sell.append((i, size, price, value))
+                        for i, (size, price) in enumerate(zip(buy_order_sizes, buy_prices)):
+                            actual_value = size * price
+                            if actual_value >= MIN_ORDER_VALUE and size >= min_order_size:
+                                filtered_buy.append((i, size, price, actual_value))
+                            else:
+                                print(f"[REFERENCE_PRICE] Buy order #{i+1} filtered: value {actual_value:.2f} USDT < {MIN_ORDER_VALUE} or size {size:.2f} < {min_order_size}")
+                        
+                        for i, (size, price) in enumerate(zip(sell_order_sizes, sell_prices)):
+                            actual_value = size * price
+                            if actual_value >= MIN_ORDER_VALUE and size >= min_order_size:
+                                filtered_sell.append((i, size, price, actual_value))
+                            else:
+                                print(f"[REFERENCE_PRICE] Sell order #{i+1} filtered: value {actual_value:.2f} USDT < {MIN_ORDER_VALUE} or size {size:.2f} < {min_order_size}")
                         
                         print(f"[REFERENCE_PRICE] Placing {len(filtered_buy)} buy orders and {len(filtered_sell)} sell orders")
                         
