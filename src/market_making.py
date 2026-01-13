@@ -317,6 +317,13 @@ def market_making(
 
                     # REFERENCE PRICE MODE: Use reference price-based bands instead of market price
                     if enable_reference_price_mode and reference_price:
+                        # Get current balances FIRST (needed for validation)
+                        balance_before_orders = fetch_account_balance()
+                        available_usdt = balance_before_orders["usdt"]["free"]
+                        available_tokens = balance_before_orders[token_symbol]["free"]
+                        usdt_locked_before = balance_before_orders["usdt"]["locked"]
+                        token_locked_before = balance_before_orders[token_symbol]["locked"]
+                        
                         # Calculate price bands based on reference price
                         # Buy band: -1% (0.1980 to 0.1998 for ref=0.2000)
                         # Sell band: +1% (0.2002 to 0.2020 for ref=0.2000)
@@ -333,6 +340,7 @@ def market_making(
                         print(f"[REFERENCE_PRICE] Buy band: {buy_band_min:.6f} to {buy_band_max:.6f}")
                         print(f"[REFERENCE_PRICE] Sell band: {sell_band_min:.6f} to {sell_band_max:.6f}")
                         print(f"[REFERENCE_PRICE] Best Buy: {best_buy_price:.6f}, Best Sell: {best_sell_price:.6f}")
+                        print(f"[REFERENCE_PRICE] Available: {available_usdt:.2f} USDT, {available_tokens:.2f} {token_symbol.upper()}")
                         
                         # Prepare ladder order sizes
                         if ladder_order_sizes and isinstance(ladder_order_sizes, list) and len(ladder_order_sizes) == orders_per_side:
