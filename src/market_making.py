@@ -71,11 +71,16 @@ def market_making(
     if enable_reference_price_mode and reference_price:
         print(f"[REFERENCE_PRICE] Mode: ENABLED")
         print(f"[REFERENCE_PRICE] Reference Price: {reference_price:.6f}")
-        print(f"[REFERENCE_PRICE] Buy Band: {reference_price * 0.99:.6f} to {reference_price * 0.9998:.6f} (-1%)")
-        print(f"[REFERENCE_PRICE] Sell Band: {reference_price * 1.0002:.6f} to {reference_price * 1.01:.6f} (+1%)")
-        print(f"[REFERENCE_PRICE] Orders per side: {orders_per_side}, Value per side: {order_value_per_side} USDT")
+        print()
+        print(f"[REFERENCE_PRICE] Buy Band: {reference_price * 0.99:.6f} to {reference_price * 0.999:.6f} (-1% band, safety buffer)")
+        print(f"[REFERENCE_PRICE] Sell Band: {reference_price * 1.001:.6f} to {reference_price * 1.01:.6f} (+1% band, safety buffer)")
+        print()
+        print(f"[REFERENCE_PRICE] Orders per side: {orders_per_side}")
+        print(f"[REFERENCE_PRICE] Value per side: {order_value_per_side} USDT")
         if ladder_order_sizes:
-            print(f"[REFERENCE_PRICE] Ladder sizes: {ladder_order_sizes}")
+            print()
+            print(f"[REFERENCE_PRICE] Ladder sizes (per side, USDT):")
+            print(f"[REFERENCE_PRICE] {ladder_order_sizes}")
     else:
         enable_reference_price_mode = False
     
@@ -325,11 +330,11 @@ def market_making(
                         token_locked_before = balance_before_orders[token_symbol]["locked"]
                         
                         # Calculate price bands based on reference price
-                        # Buy band: -1% (0.1980 to 0.1998 for ref=0.2000)
-                        # Sell band: +1% (0.2002 to 0.2020 for ref=0.2000)
+                        # Buy band: -1% (0.1980 to 0.1998 for ref=0.2000) with safety buffer
+                        # Sell band: +1% (0.2002 to 0.2020 for ref=0.2000) with safety buffer
                         buy_band_min = reference_price * 0.99  # -1%
-                        buy_band_max = reference_price * 0.9998  # -0.02% (top of buy band)
-                        sell_band_min = reference_price * 1.0002  # +0.02% (bottom of sell band)
+                        buy_band_max = reference_price * 0.999  # -0.1% (top of buy band, safety buffer)
+                        sell_band_min = reference_price * 1.001  # +0.1% (bottom of sell band, safety buffer)
                         sell_band_max = reference_price * 1.01  # +1%
                         
                         # Best prices at middle of bands (not sticky)
@@ -337,9 +342,13 @@ def market_making(
                         best_sell_price = reference_price * 1.005  # ~0.2010 for ref=0.2000
                         
                         print(f"[REFERENCE_PRICE] Using reference price mode")
-                        print(f"[REFERENCE_PRICE] Buy band: {buy_band_min:.6f} to {buy_band_max:.6f}")
-                        print(f"[REFERENCE_PRICE] Sell band: {sell_band_min:.6f} to {sell_band_max:.6f}")
-                        print(f"[REFERENCE_PRICE] Best Buy: {best_buy_price:.6f}, Best Sell: {best_sell_price:.6f}")
+                        print(f"[REFERENCE_PRICE] Buy Band: {buy_band_min:.6f} to {buy_band_max:.6f} (-1% band, safety buffer)")
+                        print(f"[REFERENCE_PRICE] Sell Band: {sell_band_min:.6f} to {sell_band_max:.6f} (+1% band, safety buffer)")
+                        print(f"[REFERENCE_PRICE] Orders per side: {orders_per_side}")
+                        print(f"[REFERENCE_PRICE] Value per side: {order_value_per_side} USDT")
+                        if ladder_order_sizes:
+                            print(f"[REFERENCE_PRICE] Ladder sizes (per side, USDT):")
+                            print(f"[REFERENCE_PRICE] {ladder_order_sizes}")
                         print(f"[REFERENCE_PRICE] Available: {available_usdt:.2f} USDT, {available_tokens:.2f} {token_symbol.upper()}")
                         
                         # Prepare ladder order sizes
