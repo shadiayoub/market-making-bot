@@ -1,5 +1,6 @@
 import time
 import traceback
+import random
 from src.utils import (
     place_order,
     cancel_all_orders,
@@ -46,6 +47,14 @@ def market_making(
     reduce_distance_on_wide_spread=True,  # Reduce max distance when spread > 20%
     wide_spread_threshold=20.0,  # Spread threshold for distance reduction
     max_buy_price=None,  # Maximum buy price limit (None or 0 to disable)
+    # Reference price mode
+    enable_reference_price_mode=False,  # Enable reference price-based pricing
+    reference_price=None,  # Reference price (e.g., 0.2000)
+    order_value_per_side=250,  # Total USDT value per side (buy or sell)
+    orders_per_side=10,  # Number of orders per side
+    ladder_order_sizes=None,  # List of order sizes in USDT (e.g., [15,15,15,25,25,25,35,35,35,35])
+    min_random_delay=1,  # Minimum random delay in seconds
+    max_random_delay=3,  # Maximum random delay in seconds
 ):
     global SYMBOL, unfilled_iterations  # Declare global at function level
     
@@ -57,6 +66,18 @@ def market_making(
         print(f"[MAX_BUY_PRICE] Maximum buy price limit: {MAX_BUY_PRICE:.6f} USDT")
     else:
         print("[MAX_BUY_PRICE] Maximum buy price limit: DISABLED")
+    
+    # REFERENCE PRICE MODE: Price bands based on reference price
+    if enable_reference_price_mode and reference_price:
+        print(f"[REFERENCE_PRICE] Mode: ENABLED")
+        print(f"[REFERENCE_PRICE] Reference Price: {reference_price:.6f}")
+        print(f"[REFERENCE_PRICE] Buy Band: {reference_price * 0.99:.6f} to {reference_price * 0.9998:.6f} (-1%)")
+        print(f"[REFERENCE_PRICE] Sell Band: {reference_price * 1.0002:.6f} to {reference_price * 1.01:.6f} (+1%)")
+        print(f"[REFERENCE_PRICE] Orders per side: {orders_per_side}, Value per side: {order_value_per_side} USDT")
+        if ladder_order_sizes:
+            print(f"[REFERENCE_PRICE] Ladder sizes: {ladder_order_sizes}")
+    else:
+        enable_reference_price_mode = False
     
     print("=" * 60)
     print("Market Making Bot Starting...")
@@ -294,11 +315,142 @@ def market_making(
                             print(f"[CANCEL] Cancelled {cancelled_orders} unfilled orders")
                         print("[CANCEL] All orders cancelled")
 
-                    # best_prices = get_best_price()
-                    # best_sell_price = best_prices["best_sell"]
-                    # best_buy_price = best_prices["best_buy"]
-                    # best_sell_price = base_sell_price
-
+                    # REFERENCE PRICE MODE: Use reference price-based bands instead of market price
+                    if enable_reference_price_mode and reference_price:
+                        # Calculate price bands based on reference price
+                        # Buy band: -1% (0.1980 to 0.1998 for ref=0.2000)
+                        # Sell band: +1% (0.2002 to 0.2020 for ref=0.2000)
+                        buy_band_min = reference_price * 0.99  # -1%
+                        buy_band_max = reference_price * 0.9998  # -0.02% (top of buy band)
+                        sell_band_min = reference_price * 1.0002  # +0.02% (bottom of sell band)
+                        sell_band_max = reference_price * 1.01  # +1%
+                        
+                        # Best prices at middle of bands (not sticky)
+                        best_buy_price = reference_price * 0.995  # ~0.1990 for ref=0.2000
+                        best_sell_price = reference_price * 1.005  # ~0.2010 for ref=0.2000
+                        
+                        print(f"[REFERENCE_PRICE] Using reference price mode")
+                        print(f"[REFERENCE_PRICE] Buy band: {buy_band_min:.6f} to {buy_band_max:.6f}")
+                        print(f"[REFERENCE_PRICE] Sell band: {sell_band_min:.6f} to {sell_band_max:.6f}")
+                        print(f"[REFERENCE_PRICE] Best Buy: {best_buy_price:.6f}, Best Sell: {best_sell_price:.6f}")
+                        
+                        # Prepare ladder order sizes
+                        if ladder_order_sizes and isinstance(ladder_order_sizes, list) and len(ladder_order_sizes) == orders_per_side:
+                            order_values_usdt = ladder_order_sizes
+                        else:
+                            # Equal distribution if ladder not provided
+                            order_values_usdt = [order_value_per_side / orders_per_side] * orders_per_side
+                        
+                        # Ensure all orders ≥ 10 USDT
+                        min_order_value = 10.0
+                        order_values_usdt = [max(val, min_order_value) for val in order_values_usdt]
+                        # Re-normalize to maintain total
+                        total_value = sum(order_values_usdt)
+                        if total_value != order_value_per_side:
+                            scale = order_value_per_side / total_value
+                            order_values_usdt = [val * scale for val in order_values_usdt]
+                        
+                        print(f"[REFERENCE_PRICE] Order values (USDT): {[f'{v:.2f}' for v in order_values_usdt]}")
+                        
+                        # Calculate buy prices (10 levels from buy_band_max down to buy_band_min)
+                        buy_prices = []
+                        for i in range(orders_per_side):
+                            # Distribute evenly across buy band
+                            progress = i / (orders_per_side - 1) if orders_per_side > 1 else 0
+                            price = buy_band_max - (buy_band_max - buy_band_min) * progress
+                            buy_prices.append(price)
+                        
+                        # Calculate sell prices (10 levels from sell_band_min up to sell_band_max)
+                        sell_prices = []
+                        for i in range(orders_per_side):
+                            # Distribute evenly across sell band
+                            progress = i / (orders_per_side - 1) if orders_per_side > 1 else 0
+                            price = sell_band_min + (sell_band_max - sell_band_min) * progress
+                            sell_prices.append(price)
+                        
+                        # Convert USDT values to token amounts
+                        buy_order_sizes = [val / price for val, price in zip(order_values_usdt, buy_prices)]
+                        sell_order_sizes = [val / price for val, price in zip(order_values_usdt, sell_prices)]
+                        
+                        # Validate against available balance
+                        total_buy_value = sum(order_values_usdt)
+                        total_sell_value = sum(order_values_usdt)
+                        
+                        if total_buy_value > available_usdt * 0.95:
+                            scale = (available_usdt * 0.95) / total_buy_value
+                            buy_order_sizes = [s * scale for s in buy_order_sizes]
+                            print(f"[REFERENCE_PRICE] Scaled down buy orders by {scale:.3f} to fit available USDT")
+                        
+                        if total_sell_value > (available_tokens * best_sell_price * 0.95):
+                            scale = (available_tokens * best_sell_price * 0.95) / total_sell_value
+                            sell_order_sizes = [s * scale for s in sell_order_sizes]
+                            print(f"[REFERENCE_PRICE] Scaled down sell orders by {scale:.3f} to fit available tokens")
+                        
+                        # Filter orders that meet minimum size/value requirements
+                        MIN_ORDER_VALUE = 10.0  # Client requirement: ≥ 10 USDT
+                        filtered_buy = []
+                        filtered_sell = []
+                        for i, (size, price, value) in enumerate(zip(buy_order_sizes, buy_prices, order_values_usdt)):
+                            if size * price >= MIN_ORDER_VALUE and size >= min_order_size:
+                                filtered_buy.append((i, size, price, value))
+                        
+                        for i, (size, price, value) in enumerate(zip(sell_order_sizes, sell_prices, order_values_usdt)):
+                            if size * price >= MIN_ORDER_VALUE and size >= min_order_size:
+                                filtered_sell.append((i, size, price, value))
+                        
+                        print(f"[REFERENCE_PRICE] Placing {len(filtered_buy)} buy orders and {len(filtered_sell)} sell orders")
+                        
+                        # Place orders
+                        buy_placed = 0
+                        sell_placed = 0
+                        buy_failed = 0
+                        sell_failed = 0
+                        
+                        for i, size, price, value in filtered_buy:
+                            order_result = place_order(SYMBOL, "buy_maker", size, price)
+                            if order_result and (order_result.get("result") == "true" or order_result.get("result") is True):
+                                order_id = order_result.get("data", {}).get("orderId") or order_result.get("data", {}).get("order_id")
+                                if order_id:
+                                    buy_order_ids.append(order_id)
+                                    buy_placed += 1
+                                    if i < 3:
+                                        print(f"  [BUY #{i+1}] Price: {price:.6f} | Size: {size:.2f} | Value: {value:.2f} USDT | Order ID: {order_id}")
+                                else:
+                                    buy_failed += 1
+                            else:
+                                buy_failed += 1
+                                if i < 3:
+                                    error = order_result.get("msg", order_result.get("error", "Unknown error")) if order_result else "No response"
+                                    print(f"  [BUY #{i+1}] FAILED: {error}")
+                        
+                        for i, size, price, value in filtered_sell:
+                            order_result = place_order(SYMBOL, "sell_maker", size, price)
+                            if order_result and (order_result.get("result") == "true" or order_result.get("result") is True):
+                                order_id = order_result.get("data", {}).get("orderId") or order_result.get("data", {}).get("order_id")
+                                if order_id:
+                                    sell_order_ids.append(order_id)
+                                    sell_placed += 1
+                                    if i < 3:
+                                        print(f"  [SELL #{i+1}] Price: {price:.6f} | Size: {size:.2f} | Value: {value:.2f} USDT | Order ID: {order_id}")
+                                else:
+                                    sell_failed += 1
+                            else:
+                                sell_failed += 1
+                                if i < 3:
+                                    error = order_result.get("msg", order_result.get("error", "Unknown error")) if order_result else "No response"
+                                    print(f"  [SELL #{i+1}] FAILED: {error}")
+                        
+                        print(f"\n[SUMMARY] Buy Orders: {buy_placed} placed, {buy_failed} failed | Sell Orders: {sell_placed} placed, {sell_failed} failed")
+                        print(f"[SUMMARY] Total Active Orders: {len(buy_order_ids) + len(sell_order_ids)}")
+                        
+                        # Add random delay before next iteration
+                        random_delay = random.uniform(min_random_delay, max_random_delay)
+                        sleep_time = get_dynamic_sleep_time(current_volatility) + random_delay
+                        print(f"\n[WAIT] Sleeping for {sleep_time:.1f} seconds (base: {sleep_time - random_delay:.1f}s + random: {random_delay:.1f}s) before next iteration...")
+                        time.sleep(sleep_time)
+                        continue  # Skip the rest of the iteration for reference price mode
+                    
+                    # STANDARD MODE: Use market price-based pricing
                     # Get the best prices for selling and buying for a low market
                     base_best_buy_price = get_buy_price_in_spread()  # This should already be below bid
                     base_best_sell_price = get_sell_price_in_spread()

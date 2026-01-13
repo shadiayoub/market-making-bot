@@ -45,6 +45,29 @@ if __name__ == "__main__":
         MAX_BUY_PRICE_STR = os.getenv("MAX_BUY_PRICE", "").strip()
         MAX_BUY_PRICE = float(MAX_BUY_PRICE_STR) if MAX_BUY_PRICE_STR and float(MAX_BUY_PRICE_STR) > 0 else None
         
+        # Read reference price mode configuration
+        ENABLE_REFERENCE_PRICE_MODE = os.getenv("ENABLE_REFERENCE_PRICE_MODE", "false").lower() == "true"
+        REFERENCE_PRICE_STR = os.getenv("REFERENCE_PRICE", "").strip()
+        REFERENCE_PRICE = float(REFERENCE_PRICE_STR) if REFERENCE_PRICE_STR and float(REFERENCE_PRICE_STR) > 0 else None
+        ORDER_VALUE_PER_SIDE = float(os.getenv("ORDER_VALUE_PER_SIDE", "250"))
+        ORDERS_PER_SIDE = int(os.getenv("ORDERS_PER_SIDE", "10"))
+        
+        # Parse ladder order sizes
+        LADDER_STR = os.getenv("LADDER_ORDER_SIZES", "").strip()
+        LADDER_ORDER_SIZES = None
+        if LADDER_STR:
+            try:
+                LADDER_ORDER_SIZES = [float(x.strip()) for x in LADDER_STR.split(",") if x.strip()]
+                if len(LADDER_ORDER_SIZES) != ORDERS_PER_SIDE:
+                    print(f"[WARNING] Ladder order sizes count ({len(LADDER_ORDER_SIZES)}) doesn't match orders per side ({ORDERS_PER_SIDE}), using equal distribution")
+                    LADDER_ORDER_SIZES = None
+            except:
+                print(f"[WARNING] Invalid ladder order sizes format, using equal distribution")
+                LADDER_ORDER_SIZES = None
+        
+        MIN_RANDOM_DELAY = float(os.getenv("MIN_RANDOM_DELAY", "1"))
+        MAX_RANDOM_DELAY = float(os.getenv("MAX_RANDOM_DELAY", "3"))
+        
         market_making(
             max_order_size=10000,  # Maximum order size in tokens (will be capped by available balance)
             min_order_size=10,     # Minimum order size in tokens (lowered to allow more orders with limited balance)
@@ -63,6 +86,14 @@ if __name__ == "__main__":
             reduce_distance_on_wide_spread=REDUCE_DISTANCE_ON_WIDE_SPREAD,  # Reduce max distance when spread is wide
             wide_spread_threshold=WIDE_SPREAD_THRESHOLD,  # Spread threshold for distance reduction
             max_buy_price=MAX_BUY_PRICE,  # Maximum buy price limit (None to disable)
+            # Reference price mode
+            enable_reference_price_mode=ENABLE_REFERENCE_PRICE_MODE,
+            reference_price=REFERENCE_PRICE,
+            order_value_per_side=ORDER_VALUE_PER_SIDE,
+            orders_per_side=ORDERS_PER_SIDE,
+            ladder_order_sizes=LADDER_ORDER_SIZES,
+            min_random_delay=MIN_RANDOM_DELAY,
+            max_random_delay=MAX_RANDOM_DELAY,
         )
 
     except KeyboardInterrupt:
