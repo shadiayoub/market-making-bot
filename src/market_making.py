@@ -414,24 +414,79 @@ def market_making(
                         else:
                             order_values_usdt_sell = order_values_usdt.copy()
                         
+                        # Check if market price is far from reference price (warning)
+                        if bid_price < buy_band_min * 0.95 or ask_price > sell_band_max * 1.05:
+                            print(f"[REFERENCE_PRICE] ⚠ WARNING: Market price far from reference price!")
+                            print(f"[REFERENCE_PRICE]   Market: Bid {bid_price:.6f}, Ask {ask_price:.6f}")
+                            print(f"[REFERENCE_PRICE]   Reference bands: Buy {buy_band_min:.6f}-{buy_band_max:.6f}, Sell {sell_band_min:.6f}-{sell_band_max:.6f}")
+                            print(f"[REFERENCE_PRICE]   Buy orders may not fill (too high), sell orders may fill too quickly")
+                        
                         # Filter orders that meet minimum size/value requirements
                         MIN_ORDER_VALUE = 10.0  # Client requirement: ≥ 10 USDT
                         filtered_buy = []
                         filtered_sell = []
                         
-                        for i, (size, price) in enumerate(zip(buy_order_sizes, buy_prices)):
-                            actual_value = size * price
-                            if actual_value >= MIN_ORDER_VALUE and size >= min_order_size:
-                                filtered_buy.append((i, size, price, actual_value))
-                            else:
-                                print(f"[REFERENCE_PRICE] Buy order #{i+1} filtered: value {actual_value:.2f} USDT < {MIN_ORDER_VALUE} or size {size:.2f} < {min_order_size}")
+                        # Check if scaling was too aggressive - if all orders are below minimum after scaling
+                        # Calculate how many orders we can actually place with available balance
+                        max_affordable_orders = int((available_usdt * 0.95) / MIN_ORDER_VALUE)
                         
-                        for i, (size, price) in enumerate(zip(sell_order_sizes, sell_prices)):
-                            actual_value = size * price
-                            if actual_value >= MIN_ORDER_VALUE and size >= min_order_size:
-                                filtered_sell.append((i, size, price, actual_value))
-                            else:
-                                print(f"[REFERENCE_PRICE] Sell order #{i+1} filtered: value {actual_value:.2f} USDT < {MIN_ORDER_VALUE} or size {size:.2f} < {min_order_size}")
+                        # If we scaled too much and can't place any orders, reduce minimum or consolidate
+                        if buy_scale < 0.4 or max_affordable_orders < 3:
+                            print(f"[REFERENCE_PRICE] ⚠ Available balance ({available_usdt:.2f} USDT) too low")
+                            print(f"[REFERENCE_PRICE]   Can afford ~{max_affordable_orders} orders at {MIN_ORDER_VALUE} USDT each")
+                            
+                            # Try to place fewer, larger orders by using only the largest orders from ladder
+                            # Reverse the order: use largest orders first (end of ladder)
+                            consolidated_buy = []
+                            consolidated_sell = []
+                            remaining_usdt = available_usdt * 0.95
+                            
+                            # Start from the end (largest orders) and work backwards
+                            for i in range(orders_per_side - 1, -1, -1):
+                                if i < len(buy_order_sizes) and remaining_usdt >= MIN_ORDER_VALUE:
+                                    size = buy_order_sizes[i]
+                                    price = buy_prices[i]
+                                    actual_value = size * price
+                                    
+                                    if actual_value >= MIN_ORDER_VALUE and size >= min_order_size and actual_value <= remaining_usdt:
+                                        consolidated_buy.append((i, size, price, actual_value))
+                                        remaining_usdt -= actual_value
+                            
+                            # Reverse to maintain price order (lowest to highest)
+                            consolidated_buy.reverse()
+                            
+                            # Same for sell orders
+                            remaining_tokens_value = (available_tokens * best_sell_price * 0.95)
+                            for i in range(orders_per_side - 1, -1, -1):
+                                if i < len(sell_order_sizes) and remaining_tokens_value >= MIN_ORDER_VALUE:
+                                    size = sell_order_sizes[i]
+                                    price = sell_prices[i]
+                                    actual_value = size * price
+                                    
+                                    if actual_value >= MIN_ORDER_VALUE and size >= min_order_size and actual_value <= remaining_tokens_value:
+                                        consolidated_sell.append((i, size, price, actual_value))
+                                        remaining_tokens_value -= actual_value
+                            
+                            consolidated_sell.reverse()
+                            
+                            filtered_buy = consolidated_buy
+                            filtered_sell = consolidated_sell
+                            print(f"[REFERENCE_PRICE] Consolidated to {len(filtered_buy)} buy and {len(filtered_sell)} sell orders (using largest orders)")
+                        else:
+                            # Normal filtering - check all orders
+                            for i, (size, price) in enumerate(zip(buy_order_sizes, buy_prices)):
+                                actual_value = size * price
+                                if actual_value >= MIN_ORDER_VALUE and size >= min_order_size:
+                                    filtered_buy.append((i, size, price, actual_value))
+                                elif i < 3:  # Only log first few filtered orders to avoid spam
+                                    print(f"[REFERENCE_PRICE] Buy order #{i+1} filtered: value {actual_value:.2f} USDT < {MIN_ORDER_VALUE} or size {size:.2f} < {min_order_size}")
+                            
+                            for i, (size, price) in enumerate(zip(sell_order_sizes, sell_prices)):
+                                actual_value = size * price
+                                if actual_value >= MIN_ORDER_VALUE and size >= min_order_size:
+                                    filtered_sell.append((i, size, price, actual_value))
+                                elif i < 3:  # Only log first few filtered orders to avoid spam
+                                    print(f"[REFERENCE_PRICE] Sell order #{i+1} filtered: value {actual_value:.2f} USDT < {MIN_ORDER_VALUE} or size {size:.2f} < {min_order_size}")
                         
                         print(f"[REFERENCE_PRICE] Placing {len(filtered_buy)} buy orders and {len(filtered_sell)} sell orders")
                         
