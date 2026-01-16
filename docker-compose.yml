@@ -15,3 +15,31 @@ services:
     # Keep container running
     stdin_open: true
     tty: true
+
+  api-server:
+    build:
+      context: ./api-server
+      dockerfile: Dockerfile
+    container_name: market-making-api
+    env_file:
+      - .env
+    volumes:
+      - ./.env:/app/.env:rw
+    ports:
+      - "3001:3001"
+    restart: unless-stopped
+    depends_on:
+      - market-making-bot
+
+  web-ui:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    container_name: market-making-web-ui
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:3001
+    restart: unless-stopped
+    depends_on:
+      - api-server
