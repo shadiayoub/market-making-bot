@@ -22,7 +22,17 @@ export function AdminDashboard({ address, onDisconnect }: AdminDashboardProps) {
 
   useEffect(() => {
     fetchConfig()
-  }, [])
+    // Store admin address for use in child components
+    if (typeof window !== 'undefined' && address) {
+      localStorage.setItem('adminAddress', address)
+      // Also add to URL for API calls
+      if (!window.location.search.includes('adminAddress')) {
+        const url = new URL(window.location.href)
+        url.searchParams.set('adminAddress', address)
+        window.history.replaceState({}, '', url.toString())
+      }
+    }
+  }, [address])
 
   const fetchConfig = async () => {
     try {
@@ -106,7 +116,7 @@ export function AdminDashboard({ address, onDisconnect }: AdminDashboardProps) {
           {activeTab === 'config' && (
             <ConfigForm config={config} onSave={handleSaveConfig} />
           )}
-          {activeTab === 'status' && <BotStatus />}
+          {activeTab === 'status' && <BotStatus address={address} />}
           {activeTab === 'logs' && <LogsViewer />}
         </div>
       </div>

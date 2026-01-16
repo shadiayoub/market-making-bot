@@ -3,6 +3,8 @@ const cors = require('cors')
 const fs = require('fs')
 const path = require('path')
 const { exec } = require('child_process')
+const { promisify } = require('util')
+const execPromise = promisify(exec)
 
 const app = express()
 const PORT = process.env.PORT || 3001
@@ -111,22 +113,84 @@ app.post('/api/config', checkAdmin, (req, res) => {
 })
 
 app.get('/api/status', async (req, res) => {
-  // This would need to connect to the bot process or read from a status file
-  // For now, return mock data
-  res.json({
-    isRunning: true,
-    balance: {
-      usdt: 159.87,
-      tokens: 39448.35,
-      tokenSymbol: 'ACCES',
-    },
-    activeOrders: 20,
-    market: {
-      bid: 0.285,
-      ask: 0.290,
-      spread: 1.75,
-    },
-  })
+  try {
+    // Check Docker container status
+    const { stdout } = await execPromise('docker ps --filter "name=lbank-market-making-bot" --format "{{.Status}}"')
+    const isRunning = stdout.trim().length > 0 && stdout.includes('Up')
+    
+    // This would need to connect to the bot process or read from a status file
+    // For now, return container status
+    res.json({
+      isRunning: isRunning,
+      containerStatus: stdout.trim() || 'Not running',
+      balance: {
+        usdt: 159.87,
+        tokens: 39448.35,
+        tokenSymbol: 'ACCES',
+      },
+      activeOrders: 20,
+      market: {
+        bid: 0.285,
+        ask: 0.290,
+        spread: 1.75,
+      },
+    })
+  } catch (error) {
+    // If docker command fails, assume not running
+    res.json({
+      isRunning: false,
+      containerStatus: 'Unknown',
+      error: error.message,
+    })
+  }
+})
+
+app.post('/api/bot/start', checkAdmin, async (req, res) => {
+  try {
+    // Start the bot container
+    const { stdout, stderr } = await execPromise('docker start lbank-market-making-bot')
+    res.json({ 
+      success: true, 
+      message: 'Bot started successfully',
+      output: stdout 
+    })
+  } catch (error) {
+    // If container doesn't exist, try docker-compose
+    try {
+      const { stdout } = await execPromise('docker-compose up -d market-making-bot', {
+        cwd: path.join(__dirname, '..')
+      })
+      res.json({ 
+        success: true, 
+        message: 'Bot started successfully via docker-compose',
+        output: stdout 
+      })
+    } catch (composeError) {
+      res.status(500).json({ 
+        success: false, 
+        error: 'Failed to start bot',
+        details: composeError.message 
+      })
+    }
+  }
+})
+
+app.post('/api/bot/stop', checkAdmin, async (req, res) => {
+  try {
+    // Stop the bot container
+    const { stdout, stderr } = await execPromise('docker stop lbank-market-making-bot')
+    res.json({ 
+      success: true, 
+      message: 'Bot stopped successfully',
+      output: stdout 
+    })
+  } catch (error) {
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to stop bot',
+      details: error.message 
+    })
+  }
 })
 
 app.get('/api/logs', (req, res) => {
