@@ -12,31 +12,15 @@ const PORT = process.env.PORT || 3001
 app.use(cors())
 app.use(express.json())
 
-// Admin wallets from environment
-const ADMIN_WALLETS = (process.env.ADMIN_WALLETS || '')
-  .split(',')
-  .map((addr) => addr.toLowerCase().trim())
-  .filter(Boolean)
-
 // Path to .env file (try multiple locations)
-let ENV_PATH = path.join(__dirname, '..', '.env')
+let ENV_PATH = path.join(process.cwd(), '.env') // Try current directory first (Docker mount location)
 if (!fs.existsSync(ENV_PATH)) {
-  // Try current directory
-  ENV_PATH = path.join(process.cwd(), '.env')
+  // Try parent directory (for local development)
+  ENV_PATH = path.join(__dirname, '..', '.env')
 }
-
-// Middleware to check admin status
-const checkAdmin = (req, res, next) => {
-  const address = req.query.adminAddress || req.body.adminAddress
-  if (!address) {
-    return res.status(401).json({ error: 'Wallet address required' })
-  }
-
-  if (!ADMIN_WALLETS.includes(address.toLowerCase())) {
-    return res.status(403).json({ error: 'Unauthorized: Not an admin wallet' })
-  }
-
-  next()
+if (!fs.existsSync(ENV_PATH)) {
+  // Try root directory
+  ENV_PATH = path.join(__dirname, '..', '..', '.env')
 }
 
 // Read .env file
@@ -58,6 +42,45 @@ function readEnvFile() {
     console.error('Error reading .env file:', error)
     return {}
   }
+}
+
+// Function to get admin wallets from .env file
+function getAdminWallets() {
+  // First try process.env (for Docker env_file)
+  if (process.env.ADMIN_WALLETS) {
+    const wallets = (process.env.ADMIN_WALLETS || '')
+      .split(',')
+      .map((addr) => addr.toLowerCase().trim())
+      .filter(Boolean)
+    console.log(`[AUTH] Loaded admin wallets from process.env: ${wallets.join(', ')}`)
+    return wallets
+  }
+  
+  // Fallback to reading from .env file
+  const config = readEnvFile()
+  const wallets = (config.ADMIN_WALLETS || '')
+    .split(',')
+    .map((addr) => addr.toLowerCase().trim())
+    .filter(Boolean)
+  console.log(`[AUTH] Loaded admin wallets from .env file: ${wallets.join(', ')}`)
+  return wallets
+}
+
+// Middleware to check admin status
+const checkAdmin = (req, res, next) => {
+  const address = req.query.adminAddress || req.body.adminAddress
+  if (!address) {
+    return res.status(401).json({ error: 'Wallet address required' })
+  }
+
+  const adminWallets = getAdminWallets()
+  if (!adminWallets.includes(address.toLowerCase())) {
+    console.log(`[AUTH] Rejected address: ${address.toLowerCase()}`)
+    console.log(`[AUTH] Admin wallets: ${adminWallets.join(', ')}`)
+    return res.status(403).json({ error: 'Unauthorized: Not an admin wallet' })
+  }
+
+  next()
 }
 
 // Write .env file
@@ -93,8 +116,12 @@ app.get('/api/admin/check', (req, res) => {
   if (!address) {
     return res.json({ isAdmin: false })
   }
+  const adminWallets = getAdminWallets()
+  const isAdmin = adminWallets.includes(address.toLowerCase())
+  console.log(`[AUTH] Checking ${address.toLowerCase()}: ${isAdmin ? 'ADMIN' : 'NOT ADMIN'}`)
+  console.log(`[AUTH] Admin wallets: ${adminWallets.join(', ')}`)
   res.json({
-    isAdmin: ADMIN_WALLETS.includes(address.toLowerCase()),
+    isAdmin: isAdmin,
   })
 })
 
@@ -199,7 +226,40 @@ app.get('/api/logs', (req, res) => {
   res.json({ logs: [] })
 })
 
+// Debug endpoint to check admin wallet configuration
+app.get('/api/debug/admin-wallets', (req, res) => {
+  const adminWallets = getAdminWallets()
+  const envPath = ENV_PATH
+  const envExists = fs.existsSync(envPath)
+  let envContent = null
+  if (envExists) {
+    try {
+      envContent = fs.readFileSync(envPath, 'utf8')
+        .split('\n')
+        .filter(line => line.includes('ADMIN_WALLETS'))
+        .join('\n')
+    } catch (e) {
+      envContent = `Error reading: ${e.message}`
+    }
+  }
+  
+  res.json({
+    adminWallets: adminWallets,
+    envPath: envPath,
+    envExists: envExists,
+    processEnvAdminWallets: process.env.ADMIN_WALLETS || 'not set',
+    envFileContent: envContent,
+  })
+})
+
 app.listen(PORT, () => {
   console.log(`API server running on port ${PORT}`)
-  console.log(`Admin wallets: ${ADMIN_WALLETS.join(', ') || 'None configured'}`)
+  const adminWallets = getAdminWallets()
+  console.log(`Admin wallets: ${adminWallets.join(', ') || 'None configured'}`)
+  console.log(`Reading .env from: ${ENV_PATH}`)
+  if (fs.existsSync(ENV_PATH)) {
+    console.log(`✓ .env file found`)
+  } else {
+    console.log(`⚠ .env file not found at ${ENV_PATH}`)
+  }
 })
