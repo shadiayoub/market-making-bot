@@ -44,13 +44,24 @@ function readEnvFile() {
   }
 }
 
+// Normalize Ethereum address (remove 0x prefix if present, ensure lowercase, trim)
+function normalizeAddress(address) {
+  if (!address) return null
+  let normalized = String(address).trim().toLowerCase()
+  // Ensure it starts with 0x
+  if (!normalized.startsWith('0x')) {
+    normalized = '0x' + normalized
+  }
+  return normalized
+}
+
 // Function to get admin wallets from .env file
 function getAdminWallets() {
   // First try process.env (for Docker env_file)
   if (process.env.ADMIN_WALLETS) {
     const wallets = (process.env.ADMIN_WALLETS || '')
       .split(',')
-      .map((addr) => addr.toLowerCase().trim())
+      .map((addr) => normalizeAddress(addr))
       .filter(Boolean)
     console.log(`[AUTH] Loaded admin wallets from process.env: ${wallets.join(', ')}`)
     return wallets
@@ -60,7 +71,7 @@ function getAdminWallets() {
   const config = readEnvFile()
   const wallets = (config.ADMIN_WALLETS || '')
     .split(',')
-    .map((addr) => addr.toLowerCase().trim())
+    .map((addr) => normalizeAddress(addr))
     .filter(Boolean)
   console.log(`[AUTH] Loaded admin wallets from .env file: ${wallets.join(', ')}`)
   return wallets
@@ -70,13 +81,28 @@ function getAdminWallets() {
 const checkAdmin = (req, res, next) => {
   const address = req.query.adminAddress || req.body.adminAddress
   if (!address) {
+    console.log(`[AUTH] checkAdmin: No address provided in ${req.method} ${req.path}`)
     return res.status(401).json({ error: 'Wallet address required' })
   }
 
+  const normalizedAddress = normalizeAddress(address)
   const adminWallets = getAdminWallets()
-  if (!adminWallets.includes(address.toLowerCase())) {
-    console.log(`[AUTH] Rejected address: ${address.toLowerCase()}`)
-    console.log(`[AUTH] Admin wallets: ${adminWallets.join(', ')}`)
+  const isAdmin = adminWallets.includes(normalizedAddress)
+  
+  console.log(`[AUTH] checkAdmin: ${req.method} ${req.path}`)
+  console.log(`[AUTH] checkAdmin: Checking "${normalizedAddress}" (original: "${address}")`)
+  console.log(`[AUTH] checkAdmin: Admin wallets: [${adminWallets.join(', ')}]`)
+  console.log(`[AUTH] checkAdmin: Match found: ${isAdmin}`)
+  
+  if (!isAdmin) {
+    console.log(`[AUTH] checkAdmin: Address comparison:`)
+    adminWallets.forEach((wallet, idx) => {
+      const matches = wallet === normalizedAddress
+      console.log(`[AUTH]   Wallet ${idx}: "${wallet}" === "${normalizedAddress}" ? ${matches}`)
+      if (wallet && normalizedAddress) {
+        console.log(`[AUTH]     Length: ${wallet.length} vs ${normalizedAddress.length}`)
+      }
+    })
     return res.status(403).json({ error: 'Unauthorized: Not an admin wallet' })
   }
 
@@ -114,12 +140,26 @@ function writeEnvFile(config) {
 app.get('/api/admin/check', (req, res) => {
   const address = req.query.address
   if (!address) {
+    console.log(`[AUTH] /api/admin/check: No address provided`)
     return res.json({ isAdmin: false })
   }
+  const normalizedAddress = normalizeAddress(address)
   const adminWallets = getAdminWallets()
-  const isAdmin = adminWallets.includes(address.toLowerCase())
-  console.log(`[AUTH] Checking ${address.toLowerCase()}: ${isAdmin ? 'ADMIN' : 'NOT ADMIN'}`)
-  console.log(`[AUTH] Admin wallets: ${adminWallets.join(', ')}`)
+  const isAdmin = adminWallets.includes(normalizedAddress)
+  console.log(`[AUTH] /api/admin/check: Checking "${normalizedAddress}" (original: "${address}")`)
+  console.log(`[AUTH] /api/admin/check: Admin wallets: [${adminWallets.join(', ')}]`)
+  console.log(`[AUTH] /api/admin/check: Match found: ${isAdmin}`)
+  if (!isAdmin) {
+    console.log(`[AUTH] /api/admin/check: Address comparison:`)
+    adminWallets.forEach((wallet, idx) => {
+      const matches = wallet === normalizedAddress
+      console.log(`[AUTH]   Wallet ${idx}: "${wallet}" === "${normalizedAddress}" ? ${matches}`)
+      if (wallet && normalizedAddress) {
+        console.log(`[AUTH]     Length: ${wallet.length} vs ${normalizedAddress.length}`)
+        console.log(`[AUTH]     Char codes match: ${wallet === normalizedAddress}`)
+      }
+    })
+  }
   res.json({
     isAdmin: isAdmin,
   })

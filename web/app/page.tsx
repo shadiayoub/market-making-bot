@@ -25,13 +25,26 @@ export default function Home() {
   }, [isConnected, address])
 
   const checkAdminStatus = async () => {
+    if (!address) {
+      console.log('[AUTH] No address available')
+      setIsAdmin(false)
+      setLoading(false)
+      return
+    }
+    
+    const normalizedAddress = address.toLowerCase().trim()
+    console.log(`[AUTH] Checking admin status for: ${normalizedAddress}`)
+    console.log(`[AUTH] API URL: ${API_URL}`)
+    
     try {
       const response = await axios.get(`${API_URL}/api/admin/check`, {
-        params: { address: address?.toLowerCase() },
+        params: { address: normalizedAddress },
       })
+      console.log(`[AUTH] Response:`, response.data)
       setIsAdmin(response.data.isAdmin)
-    } catch (error) {
-      console.error('Error checking admin status:', error)
+    } catch (error: any) {
+      console.error('[AUTH] Error checking admin status:', error)
+      console.error('[AUTH] Error response:', error.response?.data)
       setIsAdmin(false)
     } finally {
       setLoading(false)
