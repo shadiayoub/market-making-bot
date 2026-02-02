@@ -1,0 +1,539 @@
+[ITERATION 140] Fetching market data...
+[BALANCE] USDT: 709.28 free, 500.00 locked, 1209.27 total (Change: +0.00%)
+[BALANCE] ACCES: 20476.07 free, 32564.83 locked, 53040.90 total (Change: +0.00%)
+[MARKET] Bid: 0.015160 | Ask: 0.015320 | Spread: 1.055%
+[CALC] Calculating market volatility...
+[CALC] Current Volatility: 0.0015
+[PRICE] Base Buy Price: 0.015008 | Base Sell Price: 0.015473
+[ORDERS] Checking existing orders...
+[ORDERS] Found 20 existing orders
+[ADAPTIVE] Unfilled orders detected, iteration count: 140
+[ADJUSTMENTS] Reprice on move: mid moved 0.00% (≤0.2%) → skip rebuild, sleep 13.5s
+
+[ITERATION 141] Fetching market data...
+[BALANCE] USDT: 709.28 free, 500.00 locked, 1209.27 total (Change: +0.00%)
+[BALANCE] ACCES: 20476.07 free, 32564.83 locked, 53040.90 total (Change: +0.00%)
+[MARKET] Bid: 0.015160 | Ask: 0.015320 | Spread: 1.055%
+[CALC] Calculating market volatility...
+[CALC] Current Volatility: 0.0015
+[PRICE] Base Buy Price: 0.015008 | Base Sell Price: 0.015473
+[ORDERS] Checking existing orders...
+[ORDERS] Found 20 existing orders
+[ADAPTIVE] Unfilled orders detected, iteration count: 141
+[ADJUSTMENTS] Reprice on move: mid moved 0.00% (≤0.2%) → skip rebuild, sleep 26.6s
+
+[ITERATION 142] Fetching market data...
+[BALANCE] USDT: 709.28 free, 500.00 locked, 1209.27 total (Change: +0.00%)
+[BALANCE] ACCES: 20476.07 free, 32564.83 locked, 53040.90 total (Change: +0.00%)
+[MARKET] Bid: 0.015160 | Ask: 0.015320 | Spread: 1.055%
+[CALC] Calculating market volatility...
+[CALC] Current Volatility: 0.0015
+[PRICE] Base Buy Price: 0.015008 | Base Sell Price: 0.015473
+[ORDERS] Checking existing orders...
+[ORDERS] Found 20 existing orders
+[ADAPTIVE] Unfilled orders detected, iteration count: 142
+[ADJUSTMENTS] Reprice on move: mid moved 0.00% (≤0.2%) → skip rebuild, sleep 20.4s
+
+[ITERATION 143] Fetching market data...
+[BALANCE] USDT: 709.28 free, 500.00 locked, 1209.27 total (Change: +0.00%)
+[BALANCE] ACCES: 20476.07 free, 32564.83 locked, 53040.90 total (Change: +0.00%)
+[MARKET] Bid: 0.015160 | Ask: 0.015320 | Spread: 1.055%
+[CALC] Calculating market volatility...
+[CALC] Current Volatility: 0.0015
+[PRICE] Base Buy Price: 0.015008 | Base Sell Price: 0.015473
+[ORDERS] Checking existing orders...
+[ORDERS] Found 20 existing orders
+[ADAPTIVE] Unfilled orders detected, iteration count: 143
+[ADJUSTMENTS] Reprice on move: mid moved 0.00% (≤0.2%) → skip rebuild, sleep 23.7s
+
+[ITERATION 144] Fetching market data...
+[BALANCE] USDT: 709.28 free, 500.00 locked, 1209.27 total (Change: +0.00%)
+[BALANCE] ACCES: 20476.07 free, 32564.83 locked, 53040.90 total (Change: +0.00%)
+[MARKET] Bid: 0.015160 | Ask: 0.015320 | Spread: 1.055%
+[CALC] Calculating market volatility...
+[CALC] Current Volatility: 0.0015
+[PRICE] Base Buy Price: 0.015008 | Base Sell Price: 0.015473
+[ORDERS] Checking existing orders...
+[ORDERS] Found 20 existing orders
+[ADAPTIVE] Unfilled orders detected, iteration count: 144
+[ADJUSTMENTS] Reprice on move: mid moved 0.00% (≤0.2%) → skip rebuild, sleep 16.7s
+
+[ITERATION 145] Fetching market data...
+[BALANCE] USDT: 709.28 free, 500.00 locked, 1209.27 total (Change: +0.00%)
+[BALANCE] ACCES: 20476.07 free, 32564.83 locked, 53040.90 total (Change: +0.00%)
+[MARKET] Bid: 0.015160 | Ask: 0.015320 | Spread: 1.055%
+[CALC] Calculating market volatility...
+[CALC] Current Volatility: 0.0015
+[PRICE] Base Buy Price: 0.015008 | Base Sell Price: 0.015473
+[ORDERS] Checking existing orders...
+[ORDERS] Found 20 existing orders
+[ADAPTIVE] Unfilled orders detected, iteration count: 145
+[ADJUSTMENTS] Reprice on move: mid moved 0.00% (≤0.2%) → skip rebuild, sleep 16.6s
+
+[ITERATION 146] Fetching market data...
+[BALANCE] USDT: 709.28 free, 500.00 locked, 1209.27 total (Change: +0.00%)
+[BALANCE] ACCES: 20476.07 free, 32564.83 locked, 53040.90 total (Change: +0.00%)
+[MARKET] Bid: 0.015160 | Ask: 0.015320 | Spread: 1.055%
+[CALC] Calculating market volatility...
+[CALC] Current Volatility: 0.0015
+[PRICE] Base Buy Price: 0.015008 | Base Sell Price: 0.015473
+[ORDERS] Checking existing orders...
+[ORDERS] Found 20 existing orders
+[ADAPTIVE] Unfilled orders detected, iteration count: 146
+[ADJUSTMENTS] Reprice on move: mid moved 0.00% (≤0.2%) → skip rebuild, sleep 14.0s
+
+[ITERATION 147] Fetching market data...
+[BALANCE] USDT: 709.28 free, 500.00 locked, 1209.27 total (Change: +0.00%)
+[BALANCE] ACCES: 20476.07 free, 32564.83 locked, 53040.90 total (Change: +0.00%)
+[MARKET] Bid: 0.015160 | Ask: 0.015320 | Spread: 1.055%
+[CALC] Calculating market volatility...
+[CALC] Current Volatility: 0.0015
+[PRICE] Base Buy Price: 0.015008 | Base Sell Price: 0.015473
+[ORDERS] Checking existing orders...
+[ORDERS] Found 20 existing orders
+[ADAPTIVE] Unfilled orders detected, iteration count: 147
+[ADJUSTMENTS] Reprice on move: mid moved 0.00% (≤0.2%) → skip rebuild, sleep 20.3s
+
+[ITERATION 148] Fetching market data...
+[BALANCE] USDT: 709.28 free, 500.00 locked, 1209.27 total (Change: +0.00%)
+[BALANCE] ACCES: 20476.07 free, 32564.83 locked, 53040.90 total (Change: +0.00%)
+[MARKET] Bid: 0.015160 | Ask: 0.015320 | Spread: 1.055%
+[CALC] Calculating market volatility...
+[CALC] Current Volatility: 0.0015
+[PRICE] Base Buy Price: 0.015008 | Base Sell Price: 0.015473
+[ORDERS] Checking existing orders...
+[ORDERS] Found 20 existing orders
+[ADAPTIVE] Unfilled orders detected, iteration count: 148
+[ADJUSTMENTS] Reprice on move: mid moved 0.00% (≤0.2%) → skip rebuild, sleep 18.7s
+
+[ITERATION 149] Fetching market data...
+[BALANCE] USDT: 709.28 free, 500.00 locked, 1209.27 total (Change: +0.00%)
+[BALANCE] ACCES: 20476.07 free, 32564.83 locked, 53040.90 total (Change: +0.00%)
+[MARKET] Bid: 0.015160 | Ask: 0.015320 | Spread: 1.055%
+[CALC] Calculating market volatility...
+[CALC] Current Volatility: 0.0015
+[PRICE] Base Buy Price: 0.015008 | Base Sell Price: 0.015473
+[ORDERS] Checking existing orders...
+[ORDERS] Found 20 existing orders
+[ADAPTIVE] Unfilled orders detected, iteration count: 149
+[ADJUSTMENTS] Reprice on move: mid moved 0.00% (≤0.2%) → skip rebuild, sleep 19.4s
+
+[ITERATION 150] Fetching market data...
+[BALANCE] USDT: 709.28 free, 500.00 locked, 1209.27 total (Change: +0.00%)
+[BALANCE] ACCES: 20476.07 free, 32564.83 locked, 53040.90 total (Change: +0.00%)
+[MARKET] Bid: 0.015160 | Ask: 0.015320 | Spread: 1.055%
+[CALC] Calculating market volatility...
+[CALC] Current Volatility: 0.0015
+[PRICE] Base Buy Price: 0.015008 | Base Sell Price: 0.015473
+[ORDERS] Checking existing orders...
+[ORDERS] Found 20 existing orders
+[ADAPTIVE] Unfilled orders detected, iteration count: 150
+[ADJUSTMENTS] Reprice on move: mid moved 0.00% (≤0.2%) → skip rebuild, sleep 13.5s
+
+[ITERATION 151] Fetching market data...
+[BALANCE] USDT: 709.28 free, 500.00 locked, 1209.27 total (Change: +0.00%)
+[BALANCE] ACCES: 20476.07 free, 32564.83 locked, 53040.90 total (Change: +0.00%)
+[MARKET] Bid: 0.015160 | Ask: 0.015320 | Spread: 1.055%
+[CALC] Calculating market volatility...
+[CALC] Current Volatility: 0.0015
+[PRICE] Base Buy Price: 0.015008 | Base Sell Price: 0.015473
+[ORDERS] Checking existing orders...
+[ORDERS] Found 20 existing orders
+[ADAPTIVE] Unfilled orders detected, iteration count: 151
+[ADJUSTMENTS] Reprice on move: mid moved 0.00% (≤0.2%) → skip rebuild, sleep 14.0s
+
+[ITERATION 152] Fetching market data...
+[BALANCE] USDT: 709.28 free, 500.00 locked, 1209.27 total (Change: +0.00%)
+[BALANCE] ACCES: 20476.07 free, 32564.83 locked, 53040.90 total (Change: +0.00%)
+[MARKET] Bid: 0.015160 | Ask: 0.015320 | Spread: 1.055%
+[CALC] Calculating market volatility...
+[CALC] Current Volatility: 0.0015
+[PRICE] Base Buy Price: 0.015008 | Base Sell Price: 0.015473
+[ORDERS] Checking existing orders...
+[ORDERS] Found 20 existing orders
+[ADAPTIVE] Unfilled orders detected, iteration count: 152
+[ADJUSTMENTS] Reprice on move: mid moved 0.00% (≤0.2%) → skip rebuild, sleep 15.6s
+
+[ITERATION 153] Fetching market data...
+[BALANCE] USDT: 709.28 free, 500.00 locked, 1209.27 total (Change: +0.00%)
+[BALANCE] ACCES: 20476.07 free, 32564.83 locked, 53040.90 total (Change: +0.00%)
+[MARKET] Bid: 0.015160 | Ask: 0.015320 | Spread: 1.055%
+[CALC] Calculating market volatility...
+[CALC] Current Volatility: 0.0015
+[PRICE] Base Buy Price: 0.015008 | Base Sell Price: 0.015473
+[ORDERS] Checking existing orders...
+[ORDERS] Found 20 existing orders
+[ADAPTIVE] Unfilled orders detected, iteration count: 153
+[ADJUSTMENTS] Reprice on move: mid moved 0.00% (≤0.2%) → skip rebuild, sleep 18.8s
+
+[ITERATION 154] Fetching market data...
+[BALANCE] USDT: 709.28 free, 500.00 locked, 1209.27 total (Change: +0.00%)
+[BALANCE] ACCES: 20476.07 free, 32564.83 locked, 53040.90 total (Change: +0.00%)
+[MARKET] Bid: 0.015160 | Ask: 0.015320 | Spread: 1.055%
+[CALC] Calculating market volatility...
+[CALC] Current Volatility: 0.0015
+[PRICE] Base Buy Price: 0.015008 | Base Sell Price: 0.015473
+[ORDERS] Checking existing orders...
+[ORDERS] Found 20 existing orders
+[ADAPTIVE] Unfilled orders detected, iteration count: 154
+[ADJUSTMENTS] Reprice on move: mid moved 0.00% (≤0.2%) → skip rebuild, sleep 17.8s
+
+[ITERATION 155] Fetching market data...
+[BALANCE] USDT: 709.28 free, 500.00 locked, 1209.27 total (Change: +0.00%)
+[BALANCE] ACCES: 20476.07 free, 32564.83 locked, 53040.90 total (Change: +0.00%)
+[MARKET] Bid: 0.015160 | Ask: 0.015320 | Spread: 1.055%
+[CALC] Calculating market volatility...
+[CALC] Current Volatility: 0.0015
+[PRICE] Base Buy Price: 0.015008 | Base Sell Price: 0.015473
+[ORDERS] Checking existing orders...
+[ORDERS] Found 20 existing orders
+[ADAPTIVE] Unfilled orders detected, iteration count: 155
+[ADJUSTMENTS] Reprice on move: mid moved 0.00% (≤0.2%) → skip rebuild, sleep 23.6s
+
+[ITERATION 156] Fetching market data...
+[BALANCE] USDT: 709.28 free, 500.00 locked, 1209.27 total (Change: +0.00%)
+[BALANCE] ACCES: 20476.07 free, 32564.83 locked, 53040.90 total (Change: +0.00%)
+[MARKET] Bid: 0.015160 | Ask: 0.015320 | Spread: 1.055%
+[CALC] Calculating market volatility...
+[CALC] Current Volatility: 0.0015
+[PRICE] Base Buy Price: 0.015008 | Base Sell Price: 0.015473
+[ORDERS] Checking existing orders...
+[ORDERS] Found 20 existing orders
+[ADAPTIVE] Unfilled orders detected, iteration count: 156
+[ADJUSTMENTS] Reprice on move: mid moved 0.00% (≤0.2%) → skip rebuild, sleep 16.4s
+
+[ITERATION 157] Fetching market data...
+[BALANCE] USDT: 709.28 free, 500.00 locked, 1209.27 total (Change: +0.00%)
+[BALANCE] ACCES: 20476.07 free, 32564.83 locked, 53040.90 total (Change: +0.00%)
+[MARKET] Bid: 0.015160 | Ask: 0.015320 | Spread: 1.055%
+[CALC] Calculating market volatility...
+[CALC] Current Volatility: 0.0015
+[PRICE] Base Buy Price: 0.015008 | Base Sell Price: 0.015473
+[ORDERS] Checking existing orders...
+[ORDERS] Found 20 existing orders
+[ADAPTIVE] Unfilled orders detected, iteration count: 157
+[ADJUSTMENTS] Reprice on move: mid moved 0.00% (≤0.2%) → skip rebuild, sleep 19.5s
+
+[ITERATION 158] Fetching market data...
+[BALANCE] USDT: 709.28 free, 500.00 locked, 1209.27 total (Change: +0.00%)
+[BALANCE] ACCES: 20476.07 free, 32564.83 locked, 53040.90 total (Change: +0.00%)
+[MARKET] Bid: 0.015160 | Ask: 0.015320 | Spread: 1.055%
+[CALC] Calculating market volatility...
+[CALC] Current Volatility: 0.0015
+[PRICE] Base Buy Price: 0.015008 | Base Sell Price: 0.015473
+[ORDERS] Checking existing orders...
+[ORDERS] Found 20 existing orders
+[ADAPTIVE] Unfilled orders detected, iteration count: 158
+[ADJUSTMENTS] Reprice on move: mid moved 0.00% (≤0.2%) → skip rebuild, sleep 14.8s
+
+[ITERATION 159] Fetching market data...
+[BALANCE] USDT: 709.28 free, 500.00 locked, 1209.27 total (Change: +0.00%)
+[BALANCE] ACCES: 20476.07 free, 32564.83 locked, 53040.90 total (Change: +0.00%)
+[MARKET] Bid: 0.015160 | Ask: 0.015320 | Spread: 1.055%
+[CALC] Calculating market volatility...
+[CALC] Current Volatility: 0.0015
+[PRICE] Base Buy Price: 0.015008 | Base Sell Price: 0.015473
+[ORDERS] Checking existing orders...
+[ORDERS] Found 20 existing orders
+[ADAPTIVE] Unfilled orders detected, iteration count: 159
+[ADJUSTMENTS] Reprice on move: mid moved 0.00% (≤0.2%) → skip rebuild, sleep 22.1s
+
+[ITERATION 160] Fetching market data...
+[BALANCE] USDT: 709.28 free, 500.00 locked, 1209.27 total (Change: +0.00%)
+[BALANCE] ACCES: 20476.07 free, 32564.83 locked, 53040.90 total (Change: +0.00%)
+[MARKET] Bid: 0.015160 | Ask: 0.015320 | Spread: 1.055%
+[CALC] Calculating market volatility...
+[CALC] Current Volatility: 0.0015
+[PRICE] Base Buy Price: 0.015008 | Base Sell Price: 0.015473
+[ORDERS] Checking existing orders...
+[ORDERS] Found 20 existing orders
+[ADAPTIVE] Unfilled orders detected, iteration count: 160
+[ADJUSTMENTS] Reprice on move: mid moved 0.00% (≤0.2%) → skip rebuild, sleep 24.7s
+
+[ITERATION 161] Fetching market data...
+[BALANCE] USDT: 709.28 free, 500.00 locked, 1209.27 total (Change: +0.00%)
+[BALANCE] ACCES: 20476.07 free, 32564.83 locked, 53040.90 total (Change: +0.00%)
+[MARKET] Bid: 0.015160 | Ask: 0.015320 | Spread: 1.055%
+[CALC] Calculating market volatility...
+[CALC] Current Volatility: 0.0015
+[PRICE] Base Buy Price: 0.015008 | Base Sell Price: 0.015473
+[ORDERS] Checking existing orders...
+[ORDERS] Found 20 existing orders
+[ADAPTIVE] Unfilled orders detected, iteration count: 161
+[ADJUSTMENTS] Reprice on move: mid moved 0.00% (≤0.2%) → skip rebuild, sleep 23.6s
+
+[ITERATION 162] Fetching market data...
+[BALANCE] USDT: 709.28 free, 500.00 locked, 1209.27 total (Change: +0.00%)
+[BALANCE] ACCES: 20476.07 free, 32564.83 locked, 53040.90 total (Change: +0.00%)
+[MARKET] Bid: 0.015160 | Ask: 0.015320 | Spread: 1.055%
+[CALC] Calculating market volatility...
+[CALC] Current Volatility: 0.0015
+[PRICE] Base Buy Price: 0.015008 | Base Sell Price: 0.015473
+[ORDERS] Checking existing orders...
+[ORDERS] Found 20 existing orders
+[ADAPTIVE] Unfilled orders detected, iteration count: 162
+[ADJUSTMENTS] Reprice on move: mid moved 0.00% (≤0.2%) → skip rebuild, sleep 19.5s
+
+[ITERATION 163] Fetching market data...
+[BALANCE] USDT: 709.28 free, 500.00 locked, 1209.27 total (Change: +0.00%)
+[BALANCE] ACCES: 20476.07 free, 32564.83 locked, 53040.90 total (Change: +0.00%)
+[MARKET] Bid: 0.015160 | Ask: 0.015320 | Spread: 1.055%
+[CALC] Calculating market volatility...
+[CALC] Current Volatility: 0.0015
+[PRICE] Base Buy Price: 0.015008 | Base Sell Price: 0.015473
+[ORDERS] Checking existing orders...
+[ORDERS] Found 20 existing orders
+[ADAPTIVE] Unfilled orders detected, iteration count: 163
+[ADJUSTMENTS] Reprice on move: mid moved 0.00% (≤0.2%) → skip rebuild, sleep 18.0s
+
+[ITERATION 164] Fetching market data...
+[BALANCE] USDT: 709.28 free, 500.00 locked, 1209.27 total (Change: +0.00%)
+[BALANCE] ACCES: 20476.07 free, 32564.83 locked, 53040.90 total (Change: +0.00%)
+[MARKET] Bid: 0.015160 | Ask: 0.015320 | Spread: 1.055%
+[CALC] Calculating market volatility...
+[CALC] Current Volatility: 0.0015
+[PRICE] Base Buy Price: 0.015008 | Base Sell Price: 0.015473
+[ORDERS] Checking existing orders...
+[ORDERS] Found 20 existing orders
+[ADAPTIVE] Unfilled orders detected, iteration count: 164
+[ADJUSTMENTS] Reprice on move: mid moved 0.00% (≤0.2%) → skip rebuild, sleep 20.6s
+
+[ITERATION 165] Fetching market data...
+[BALANCE] USDT: 709.28 free, 500.00 locked, 1209.27 total (Change: +0.00%)
+[BALANCE] ACCES: 20476.07 free, 32564.83 locked, 53040.90 total (Change: +0.00%)
+[MARKET] Bid: 0.015160 | Ask: 0.015320 | Spread: 1.055%
+[CALC] Calculating market volatility...
+[CALC] Current Volatility: 0.0015
+[PRICE] Base Buy Price: 0.015008 | Base Sell Price: 0.015473
+[ORDERS] Checking existing orders...
+[ORDERS] Found 20 existing orders
+[ADAPTIVE] Unfilled orders detected, iteration count: 165
+[ADJUSTMENTS] Reprice on move: mid moved 0.00% (≤0.2%) → skip rebuild, sleep 18.4s
+
+[ITERATION 166] Fetching market data...
+[BALANCE] USDT: 709.28 free, 500.00 locked, 1209.27 total (Change: +0.00%)
+[BALANCE] ACCES: 20476.07 free, 32564.83 locked, 53040.90 total (Change: +0.00%)
+[MARKET] Bid: 0.015160 | Ask: 0.015320 | Spread: 1.055%
+[CALC] Calculating market volatility...
+[CALC] Current Volatility: 0.0015
+[PRICE] Base Buy Price: 0.015008 | Base Sell Price: 0.015473
+[ORDERS] Checking existing orders...
+[ORDERS] Found 20 existing orders
+[ADAPTIVE] Unfilled orders detected, iteration count: 166
+[ADJUSTMENTS] Reprice on move: mid moved 0.00% (≤0.2%) → skip rebuild, sleep 17.8s
+
+[ITERATION 167] Fetching market data...
+[BALANCE] USDT: 709.28 free, 500.00 locked, 1209.27 total (Change: +0.00%)
+[BALANCE] ACCES: 20476.07 free, 32564.83 locked, 53040.90 total (Change: +0.00%)
+[MARKET] Bid: 0.015160 | Ask: 0.015320 | Spread: 1.055%
+[CALC] Calculating market volatility...
+[CALC] Current Volatility: 0.0015
+[PRICE] Base Buy Price: 0.015008 | Base Sell Price: 0.015473
+[ORDERS] Checking existing orders...
+[ORDERS] Found 20 existing orders
+[ADAPTIVE] Unfilled orders detected, iteration count: 167
+[ADJUSTMENTS] Reprice on move: mid moved 0.00% (≤0.2%) → skip rebuild, sleep 15.1s
+
+[ITERATION 168] Fetching market data...
+[BALANCE] USDT: 709.28 free, 500.00 locked, 1209.27 total (Change: +0.00%)
+[BALANCE] ACCES: 20476.07 free, 32564.83 locked, 53040.90 total (Change: +0.00%)
+[MARKET] Bid: 0.015160 | Ask: 0.015320 | Spread: 1.055%
+[CALC] Calculating market volatility...
+[CALC] Current Volatility: 0.0015
+[PRICE] Base Buy Price: 0.015008 | Base Sell Price: 0.015473
+[ORDERS] Checking existing orders...
+[ORDERS] Found 20 existing orders
+[ADAPTIVE] Unfilled orders detected, iteration count: 168
+[ADJUSTMENTS] Reprice on move: mid moved 0.00% (≤0.2%) → skip rebuild, sleep 23.3s
+
+[ITERATION 169] Fetching market data...
+[BALANCE] USDT: 709.28 free, 500.00 locked, 1209.27 total (Change: +0.00%)
+[BALANCE] ACCES: 20476.07 free, 32564.83 locked, 53040.90 total (Change: +0.00%)
+[MARKET] Bid: 0.015160 | Ask: 0.015320 | Spread: 1.055%
+[CALC] Calculating market volatility...
+[CALC] Current Volatility: 0.0015
+[PRICE] Base Buy Price: 0.015008 | Base Sell Price: 0.015473
+[ORDERS] Checking existing orders...
+[ORDERS] Found 20 existing orders
+[ADAPTIVE] Unfilled orders detected, iteration count: 169
+[ADJUSTMENTS] Reprice on move: mid moved 0.00% (≤0.2%) → skip rebuild, sleep 13.6s
+
+[ITERATION 170] Fetching market data...
+[BALANCE] USDT: 709.28 free, 500.00 locked, 1209.27 total (Change: +0.00%)
+[BALANCE] ACCES: 20476.07 free, 32564.83 locked, 53040.90 total (Change: +0.00%)
+[MARKET] Bid: 0.015160 | Ask: 0.015320 | Spread: 1.055%
+[CALC] Calculating market volatility...
+[CALC] Current Volatility: 0.0015
+[PRICE] Base Buy Price: 0.015008 | Base Sell Price: 0.015473
+[ORDERS] Checking existing orders...
+[ORDERS] Found 20 existing orders
+[ADAPTIVE] Unfilled orders detected, iteration count: 170
+[ADJUSTMENTS] Reprice on move: mid moved 0.00% (≤0.2%) → skip rebuild, sleep 15.0s
+
+[ITERATION 171] Fetching market data...
+[BALANCE] USDT: 709.28 free, 500.00 locked, 1209.27 total (Change: +0.00%)
+[BALANCE] ACCES: 20476.07 free, 32564.83 locked, 53040.90 total (Change: +0.00%)
+[MARKET] Bid: 0.015160 | Ask: 0.015320 | Spread: 1.055%
+[CALC] Calculating market volatility...
+[CALC] Current Volatility: 0.0015
+[PRICE] Base Buy Price: 0.015008 | Base Sell Price: 0.015473
+[ORDERS] Checking existing orders...
+[ORDERS] Found 20 existing orders
+[ADAPTIVE] Unfilled orders detected, iteration count: 171
+[ADJUSTMENTS] Reprice on move: mid moved 0.00% (≤0.2%) → skip rebuild, sleep 21.2s
+
+[ITERATION 172] Fetching market data...
+[BALANCE] USDT: 709.28 free, 500.00 locked, 1209.27 total (Change: +0.00%)
+[BALANCE] ACCES: 20476.07 free, 32564.83 locked, 53040.90 total (Change: +0.00%)
+[MARKET] Bid: 0.015160 | Ask: 0.015320 | Spread: 1.055%
+[CALC] Calculating market volatility...
+[CALC] Current Volatility: 0.0015
+[PRICE] Base Buy Price: 0.015008 | Base Sell Price: 0.015473
+[ORDERS] Checking existing orders...
+[ORDERS] Found 20 existing orders
+[ADAPTIVE] Unfilled orders detected, iteration count: 172
+[ADJUSTMENTS] Reprice on move: mid moved 0.00% (≤0.2%) → skip rebuild, sleep 24.9s
+
+[ITERATION 173] Fetching market data...
+[BALANCE] USDT: 709.28 free, 500.00 locked, 1209.27 total (Change: +0.00%)
+[BALANCE] ACCES: 20476.07 free, 32564.83 locked, 53040.90 total (Change: +0.00%)
+[MARKET] Bid: 0.015160 | Ask: 0.015320 | Spread: 1.055%
+[CALC] Calculating market volatility...
+[CALC] Current Volatility: 0.0015
+[PRICE] Base Buy Price: 0.015008 | Base Sell Price: 0.015473
+[ORDERS] Checking existing orders...
+[ORDERS] Found 20 existing orders
+[ADAPTIVE] Unfilled orders detected, iteration count: 173
+[ADJUSTMENTS] Reprice on move: mid moved 0.00% (≤0.2%) → skip rebuild, sleep 22.3s
+
+[ITERATION 174] Fetching market data...
+[BALANCE] USDT: 709.28 free, 500.00 locked, 1209.27 total (Change: +0.00%)
+[BALANCE] ACCES: 20476.07 free, 32564.83 locked, 53040.90 total (Change: +0.00%)
+[MARKET] Bid: 0.015160 | Ask: 0.015320 | Spread: 1.055%
+[CALC] Calculating market volatility...
+[CALC] Current Volatility: 0.0015
+[PRICE] Base Buy Price: 0.015008 | Base Sell Price: 0.015473
+[ORDERS] Checking existing orders...
+[ORDERS] Found 20 existing orders
+[ADAPTIVE] Unfilled orders detected, iteration count: 174
+[ADJUSTMENTS] Reprice on move: mid moved 0.00% (≤0.2%) → skip rebuild, sleep 17.5s
+
+[ITERATION 175] Fetching market data...
+[BALANCE] USDT: 709.28 free, 500.00 locked, 1209.27 total (Change: +0.00%)
+[BALANCE] ACCES: 20476.07 free, 32564.83 locked, 53040.90 total (Change: +0.00%)
+[MARKET] Bid: 0.015160 | Ask: 0.015320 | Spread: 1.055%
+[CALC] Calculating market volatility...
+[CALC] Current Volatility: 0.0015
+[PRICE] Base Buy Price: 0.015008 | Base Sell Price: 0.015473
+[ORDERS] Checking existing orders...
+[ORDERS] Found 20 existing orders
+[ADAPTIVE] Unfilled orders detected, iteration count: 175
+[ADJUSTMENTS] Reprice on move: mid moved 0.00% (≤0.2%) → skip rebuild, sleep 13.3s
+
+[ITERATION 176] Fetching market data...
+[BALANCE] USDT: 709.28 free, 500.00 locked, 1209.27 total (Change: +0.00%)
+[BALANCE] ACCES: 20476.07 free, 32564.83 locked, 53040.90 total (Change: +0.00%)
+[MARKET] Bid: 0.015160 | Ask: 0.015320 | Spread: 1.055%
+[CALC] Calculating market volatility...
+[CALC] Current Volatility: 0.0015
+[PRICE] Base Buy Price: 0.015008 | Base Sell Price: 0.015473
+[ORDERS] Checking existing orders...
+[ORDERS] Found 20 existing orders
+[ADAPTIVE] Unfilled orders detected, iteration count: 176
+[ADJUSTMENTS] Reprice on move: mid moved 0.00% (≤0.2%) → skip rebuild, sleep 15.3s
+
+[ITERATION 177] Fetching market data...
+[BALANCE] USDT: 709.28 free, 500.00 locked, 1209.27 total (Change: +0.00%)
+[BALANCE] ACCES: 20476.07 free, 32564.83 locked, 53040.90 total (Change: +0.00%)
+[MARKET] Bid: 0.015160 | Ask: 0.015320 | Spread: 1.055%
+[CALC] Calculating market volatility...
+[CALC] Current Volatility: 0.0015
+[PRICE] Base Buy Price: 0.015008 | Base Sell Price: 0.015473
+[ORDERS] Checking existing orders...
+[ORDERS] Found 20 existing orders
+[ADAPTIVE] Unfilled orders detected, iteration count: 177
+[ADJUSTMENTS] Reprice on move: mid moved 0.00% (≤0.2%) → skip rebuild, sleep 15.0s
+
+[ITERATION 178] Fetching market data...
+[BALANCE] USDT: 709.28 free, 500.00 locked, 1209.27 total (Change: +0.00%)
+[BALANCE] ACCES: 20476.07 free, 32564.83 locked, 53040.90 total (Change: +0.00%)
+[MARKET] Bid: 0.015160 | Ask: 0.015320 | Spread: 1.055%
+[CALC] Calculating market volatility...
+[CALC] Current Volatility: 0.0015
+[PRICE] Base Buy Price: 0.015008 | Base Sell Price: 0.015473
+[ORDERS] Checking existing orders...
+[ORDERS] Found 20 existing orders
+[ADAPTIVE] Unfilled orders detected, iteration count: 178
+[ADJUSTMENTS] Reprice on move: mid moved 0.00% (≤0.2%) → skip rebuild, sleep 18.7s
+
+[ITERATION 179] Fetching market data...
+[BALANCE] USDT: 709.28 free, 500.00 locked, 1209.27 total (Change: +0.00%)
+[BALANCE] ACCES: 20476.07 free, 32564.83 locked, 53040.90 total (Change: +0.00%)
+[MARKET] Bid: 0.015160 | Ask: 0.015320 | Spread: 1.055%
+[CALC] Calculating market volatility...
+[CALC] Current Volatility: 0.0015
+[PRICE] Base Buy Price: 0.015008 | Base Sell Price: 0.015473
+[ORDERS] Checking existing orders...
+[ORDERS] Found 20 existing orders
+[ADAPTIVE] Unfilled orders detected, iteration count: 179
+[ADJUSTMENTS] Reprice on move: mid moved 0.00% (≤0.2%) → skip rebuild, sleep 20.8s
+
+[ITERATION 180] Fetching market data...
+[BALANCE] USDT: 709.28 free, 500.00 locked, 1209.27 total (Change: +0.00%)
+[BALANCE] ACCES: 20476.07 free, 32564.83 locked, 53040.90 total (Change: +0.00%)
+[MARKET] Bid: 0.015160 | Ask: 0.015320 | Spread: 1.055%
+[CALC] Calculating market volatility...
+[CALC] Current Volatility: 0.0015
+[PRICE] Base Buy Price: 0.015008 | Base Sell Price: 0.015473
+[ORDERS] Checking existing orders...
+[ORDERS] Found 20 existing orders
+[ADAPTIVE] Unfilled orders detected, iteration count: 180
+[ADJUSTMENTS] Reprice on move: mid moved 0.00% (≤0.2%) → skip rebuild, sleep 15.5s
+
+[ITERATION 181] Fetching market data...
+[BALANCE] USDT: 709.28 free, 500.00 locked, 1209.27 total (Change: +0.00%)
+[BALANCE] ACCES: 20476.07 free, 32564.83 locked, 53040.90 total (Change: +0.00%)
+[MARKET] Bid: 0.015160 | Ask: 0.015320 | Spread: 1.055%
+[CALC] Calculating market volatility...
+[CALC] Current Volatility: 0.0015
+[PRICE] Base Buy Price: 0.015008 | Base Sell Price: 0.015473
+[ORDERS] Checking existing orders...
+[ORDERS] Found 20 existing orders
+[ADAPTIVE] Unfilled orders detected, iteration count: 181
+[ADJUSTMENTS] Reprice on move: mid moved 0.00% (≤0.2%) → skip rebuild, sleep 16.1s
+
+[ITERATION 182] Fetching market data...
+[BALANCE] USDT: 709.28 free, 500.00 locked, 1209.27 total (Change: +0.00%)
+[BALANCE] ACCES: 20476.07 free, 32564.83 locked, 53040.90 total (Change: +0.00%)
+[MARKET] Bid: 0.015160 | Ask: 0.015320 | Spread: 1.055%
+[CALC] Calculating market volatility...
+[CALC] Current Volatility: 0.0015
+[PRICE] Base Buy Price: 0.015008 | Base Sell Price: 0.015473
+[ORDERS] Checking existing orders...
+[ORDERS] Found 20 existing orders
+[ADAPTIVE] Unfilled orders detected, iteration count: 182
+[ADJUSTMENTS] Reprice on move: mid moved 0.00% (≤0.2%) → skip rebuild, sleep 25.0s
+
+[ITERATION 183] Fetching market data...
+[BALANCE] USDT: 709.28 free, 500.00 locked, 1209.27 total (Change: +0.00%)
+[BALANCE] ACCES: 20476.07 free, 32564.83 locked, 53040.90 total (Change: +0.00%)
+[MARKET] Bid: 0.015160 | Ask: 0.015320 | Spread: 1.055%
+[CALC] Calculating market volatility...
+[CALC] Current Volatility: 0.0015
+[PRICE] Base Buy Price: 0.015008 | Base Sell Price: 0.015473
+[ORDERS] Checking existing orders...
+[ORDERS] Found 20 existing orders
+[ADAPTIVE] Unfilled orders detected, iteration count: 183
+[ADJUSTMENTS] Reprice on move: mid moved 0.00% (≤0.2%) → skip rebuild, sleep 19.6s
+
+[ITERATION 184] Fetching market data...
+[BALANCE] USDT: 709.28 free, 500.00 locked, 1209.27 total (Change: +0.00%)
+[BALANCE] ACCES: 20476.07 free, 32564.83 locked, 53040.90 total (Change: +0.00%)
+[MARKET] Bid: 0.015160 | Ask: 0.015320 | Spread: 1.055%
+[CALC] Calculating market volatility...
+[CALC] Current Volatility: 0.0015
+[PRICE] Base Buy Price: 0.015008 | Base Sell Price: 0.015473
+[ORDERS] Checking existing orders...
+[ORDERS] Found 20 existing orders
+[ADAPTIVE] Unfilled orders detected, iteration count: 184
+[ADJUSTMENTS] Reprice on move: mid moved 0.00% (≤0.2%) → skip rebuild, sleep 15.3s
