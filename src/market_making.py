@@ -293,12 +293,15 @@ def market_making(
                     
                     # Check order status to detect filled orders BEFORE cancelling
                     # Also check for buy orders above MAX_BUY_PRICE to cancel them
+                    # Also compute open order depth (USDT) per side for depth-balance check
                     filled_buy_value = 0.0
                     filled_sell_value = 0.0
                     filled_buy_qty = 0.0
                     filled_sell_qty = 0.0
                     cancelled_orders = 0
                     buy_orders_above_limit = []  # Store order IDs to cancel
+                    open_buy_depth_usdt = 0.0
+                    open_sell_depth_usdt = 0.0
                     
                     if current_orders_number > 0:
                         try:
@@ -315,6 +318,7 @@ def market_making(
                                         trade_type = order.get("tradeType", "").lower()
                                         status = order.get("status", 0)
                                         order_id = order.get("orderId") or order.get("order_id")
+                                        remaining_qty = orig_qty - executed_qty if orig_qty >= executed_qty else 0.0
                                         
                                         # Check if order was filled (executedQty > 0 or status indicates fill)
                                         if executed_qty > 0:
@@ -324,6 +328,14 @@ def market_making(
                                             elif "sell" in trade_type:
                                                 filled_sell_qty += executed_qty
                                                 filled_sell_value += executed_qty * price
+                                        # Open order depth: remaining size * price (for depth-balance check)
+                                        if remaining_qty > 0 and price > 0:
+                                            if "buy" in trade_type:
+                                                open_buy_depth_usdt += remaining_qty * price
+                                            elif "sell" in trade_type:
+                                                open_sell_depth_usdt += remaining_qty * price
+                                        if orig_qty > 0 and remaining_qty <= 0:
+                                            pass  # fully filled, not open
                                         elif orig_qty > 0:
                                             # Check if this is a buy order above MAX_BUY_PRICE (if enabled)
                                             if MAX_BUY_PRICE and "buy" in trade_type and price > MAX_BUY_PRICE:
@@ -434,9 +446,23 @@ def market_making(
                         if buy_scale < 1.0 or sell_scale < 1.0:
                             print(f"[ADJUSTMENTS] Inventory guard: token {token_pct*100:.1f}% / USDT {usdt_pct*100:.1f}% → buy_scale={buy_scale}, sell_scale={sell_scale}")
                         
-                        # Reprice on move: skip rebuild if mid moved ≤ threshold and we have orders
+                        # 1) Depth balance: force rebuild if one side is > 5% stronger than the other
+                        force_rebuild = False
+                        if open_buy_depth_usdt > 0 or open_sell_depth_usdt > 0:
+                            if open_buy_depth_usdt > open_sell_depth_usdt * 1.05 or open_sell_depth_usdt > open_buy_depth_usdt * 1.05:
+                                force_rebuild = True
+                                print(f"[ADJUSTMENTS] Depth balance: buy_depth={open_buy_depth_usdt:.0f} USDT, sell_depth={open_sell_depth_usdt:.0f} USDT → force rebuild (imbalance > 5%)")
+                        
+                        # 2) Rebuild after any significant fill (price protection: rebuild both sides together)
+                        filled_total_usdt = filled_buy_value + filled_sell_value
+                        fill_threshold = max(50.0, target_depth_per_side * 0.10)
+                        if filled_total_usdt >= fill_threshold:
+                            force_rebuild = True
+                            print(f"[ADJUSTMENTS] Significant fill: {filled_total_usdt:.0f} USDT (≥ {fill_threshold:.0f}) → force rebuild")
+                        
+                        # Reprice on move: skip rebuild only if mid moved ≤ threshold, we have orders, and no force_rebuild
                         skip_rebuild = False
-                        if reprice_on_move and last_ladder_mid is not None and current_orders_number > 0:
+                        if not force_rebuild and reprice_on_move and last_ladder_mid is not None and current_orders_number > 0:
                             move_pct = abs(mid_price - last_ladder_mid) / last_ladder_mid * 100 if last_ladder_mid > 0 else 100
                             if move_pct <= reprice_move_pct:
                                 skip_rebuild = True
@@ -481,6 +507,18 @@ def market_making(
                         min_tokens_per_order = 10.0  # adjustments.md: ≥ 10 ACCES
                         buy_sizes_adj = [max(min_tokens_per_order, depth_per_level_buy_usdt / p) for p in buy_prices_adj]
                         sell_sizes_adj = [max(min_tokens_per_order, depth_per_level_sell_usdt / p) for p in sell_prices_adj]
+                        
+                        # 3) Prevent accumulation at same price: merge duplicate price levels (one order per price)
+                        def merge_same_prices(prices, sizes, round_decimals=5):
+                            by_price = {}
+                            for p, s in zip(prices, sizes):
+                                pk = round(p, round_decimals)
+                                by_price[pk] = by_price.get(pk, 0) + s
+                            merged_prices = sorted(by_price.keys())
+                            merged_sizes = [by_price[p] for p in merged_prices]
+                            return merged_prices, merged_sizes
+                        buy_prices_adj, buy_sizes_adj = merge_same_prices(buy_prices_adj, buy_sizes_adj)
+                        sell_prices_adj, sell_sizes_adj = merge_same_prices(sell_prices_adj, sell_sizes_adj)
                         
                         # Balance check: scale down if needed
                         balance_adj = fetch_account_balance()
