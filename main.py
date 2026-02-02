@@ -68,6 +68,26 @@ if __name__ == "__main__":
         MIN_RANDOM_DELAY = float(os.getenv("MIN_RANDOM_DELAY", "1"))
         MAX_RANDOM_DELAY = float(os.getenv("MAX_RANDOM_DELAY", "3"))
         
+        # Adjustments mode (from adjustments.md): mid-based ±1% ladder, 0.8% spread, capital protections
+        ENABLE_ADJUSTMENTS_MODE = os.getenv("ENABLE_ADJUSTMENTS_MODE", "false").lower() == "true"
+        TARGET_DEPTH_PER_SIDE = float(os.getenv("TARGET_DEPTH_PER_SIDE", "500"))
+        LEVELS_PER_SIDE = int(os.getenv("LEVELS_PER_SIDE", "10"))
+        BEST_SPREAD_SIDE_PCT = float(os.getenv("BEST_SPREAD_SIDE_PCT", "0.4"))
+        REFRESH_SECONDS_MIN = float(os.getenv("REFRESH_SECONDS_MIN", "25"))
+        REFRESH_SECONDS_MAX = float(os.getenv("REFRESH_SECONDS_MAX", "45"))
+        REFRESH_RANDOM_SECONDS = float(os.getenv("REFRESH_RANDOM_SECONDS", "3"))
+        REPRICE_ON_MOVE = os.getenv("REPRICE_ON_MOVE", "true").lower() == "true"
+        REPRICE_MOVE_PCT = float(os.getenv("REPRICE_MOVE_PCT", "0.3"))
+        VOLATILITY_PAUSE_2PCT_60S_MINUTES = float(os.getenv("VOLATILITY_PAUSE_2PCT_60S_MINUTES", "10"))
+        VOLATILITY_PAUSE_5PCT_5M_MINUTES = float(os.getenv("VOLATILITY_PAUSE_5PCT_5M_MINUTES", "30"))
+        SPREAD_GUARD_THRESHOLD_PCT = float(os.getenv("SPREAD_GUARD_THRESHOLD_PCT", "1.5"))
+        SPREAD_GUARD_DURATION_SECONDS = float(os.getenv("SPREAD_GUARD_DURATION_SECONDS", "120"))
+        SPREAD_GUARD_REBUILD_SPREAD_PCT = float(os.getenv("SPREAD_GUARD_REBUILD_SPREAD_PCT", "1.2"))
+        INVENTORY_GUARD_MAX_SIDE_PCT = float(os.getenv("INVENTORY_GUARD_MAX_SIDE_PCT", "65"))
+        INVENTORY_REDUCE_SCALE = float(os.getenv("INVENTORY_REDUCE_SCALE", "0.5"))
+        ANTI_SNIPE_MAX_FILLS_IN_30S = int(os.getenv("ANTI_SNIPE_MAX_FILLS_IN_30S", "3"))
+        ANTI_SNIPE_COOLDOWN_SECONDS = float(os.getenv("ANTI_SNIPE_COOLDOWN_SECONDS", "300"))
+        
         market_making(
             max_order_size=10000,  # Maximum order size in tokens (will be capped by available balance)
             min_order_size=10,     # Minimum order size in tokens (lowered to allow more orders with limited balance)
@@ -94,6 +114,25 @@ if __name__ == "__main__":
             ladder_order_sizes=LADDER_ORDER_SIZES,
             min_random_delay=MIN_RANDOM_DELAY,
             max_random_delay=MAX_RANDOM_DELAY,
+            # Adjustments mode (from adjustments.md)
+            enable_adjustments_mode=ENABLE_ADJUSTMENTS_MODE,
+            target_depth_per_side=TARGET_DEPTH_PER_SIDE,
+            levels_per_side=LEVELS_PER_SIDE,
+            best_spread_side_pct=BEST_SPREAD_SIDE_PCT,
+            refresh_seconds_min=REFRESH_SECONDS_MIN,
+            refresh_seconds_max=REFRESH_SECONDS_MAX,
+            refresh_random_seconds=REFRESH_RANDOM_SECONDS,
+            reprice_on_move=REPRICE_ON_MOVE,
+            reprice_move_pct=REPRICE_MOVE_PCT,
+            volatility_pause_2pct_60s_minutes=VOLATILITY_PAUSE_2PCT_60S_MINUTES,
+            volatility_pause_5pct_5m_minutes=VOLATILITY_PAUSE_5PCT_5M_MINUTES,
+            spread_guard_threshold_pct=SPREAD_GUARD_THRESHOLD_PCT,
+            spread_guard_duration_seconds=SPREAD_GUARD_DURATION_SECONDS,
+            spread_guard_rebuild_spread_pct=SPREAD_GUARD_REBUILD_SPREAD_PCT,
+            inventory_guard_max_side_pct=INVENTORY_GUARD_MAX_SIDE_PCT,
+            inventory_reduce_scale=INVENTORY_REDUCE_SCALE,
+            anti_snipe_max_fills_in_30s=ANTI_SNIPE_MAX_FILLS_IN_30S,
+            anti_snipe_cooldown_seconds=ANTI_SNIPE_COOLDOWN_SECONDS,
         )
 
     except KeyboardInterrupt:

@@ -60,7 +60,21 @@ Ensure you have sufficient balance:
 - **USDT**: At least 500 USDT for buy orders
 - **Token**: Sufficient tokens for sell orders (equivalent to ~500 USDT worth)
 
-### 4. Order Size Adjustment (Optional)
+### 4. Adjustments Mode (from adjustments.md)
+When `ENABLE_ADJUSTMENTS_MODE=true`, the bot uses a mid-based ±1% ladder with capital protections:
+
+- **Depth**: 500 USDT per side (buy + sell) within ±1% of mid price, 10 levels per side.
+- **Spread**: Best bid/ask at ±0.4% from mid (0.8% total); configurable via `BEST_SPREAD_SIDE_PCT`.
+- **Refresh**: 25–45 s + ±3 s randomness (`REFRESH_SECONDS_MIN/MAX`, `REFRESH_RANDOM_SECONDS`).
+- **Reprice on move**: Rebuild ladder only when mid moves more than 0.3% (`REPRICE_MOVE_PCT`).
+- **Volatility kill-switch**: Pause 10 min if price moves ≥2% in 60 s; 30 min if ≥5% in 5 min.
+- **Spread guard**: If spread > 1.5% for 2 min, cancel and rebuild at 1.2% temporarily.
+- **Inventory guard**: If token value > 65% or USDT > 65%, reduce that side’s depth by 50%.
+- **Anti-snipe**: If >3 orders fill within 30 s, pause placing new orders for 5 min.
+
+See `.env.example` for all `TARGET_DEPTH_PER_SIDE`, `LEVELS_PER_SIDE`, `REPRICE_*`, `VOLATILITY_*`, `SPREAD_GUARD_*`, `INVENTORY_*`, and `ANTI_SNIPE_*` options.
+
+### 5. Order Size Adjustment (Optional)
 If your token price is significantly different, you may need to adjust `max_order_size` and `min_order_size` in `main.py`:
 - For higher-priced tokens: Reduce these values
 - For lower-priced tokens: Increase these values

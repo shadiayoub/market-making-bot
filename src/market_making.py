@@ -1,6 +1,7 @@
 import time
 import traceback
 import random
+from collections import deque
 from src.utils import (
     place_order,
     cancel_all_orders,
@@ -27,6 +28,10 @@ SYMBOL = pair  # Use the pair from utils.py
 
 # Track iterations for adaptive pricing (gradual spread narrowing)
 unfilled_iterations = 0  # Count of iterations with unfilled orders
+
+# Adjustments mode state (from adjustments.md)
+_price_history = deque(maxlen=400)  # (timestamp, mid) for ~5 min at 1 sample/iteration
+_fill_timestamps = deque(maxlen=50)  # timestamps of detected fills (for anti-sniping)
 
 
 def market_making(
@@ -55,8 +60,27 @@ def market_making(
     ladder_order_sizes=None,  # List of order sizes in USDT (e.g., [15,15,15,25,25,25,35,35,35,35])
     min_random_delay=1,  # Minimum random delay in seconds
     max_random_delay=3,  # Maximum random delay in seconds
+    # Adjustments mode (from adjustments.md): mid-based ±1% ladder, 0.8% spread, capital protections
+    enable_adjustments_mode=False,
+    target_depth_per_side=500,  # USDT per side within ±1%
+    levels_per_side=10,
+    best_spread_side_pct=0.4,  # 0.4% each side → 0.8% total spread
+    refresh_seconds_min=25,
+    refresh_seconds_max=45,
+    refresh_random_seconds=3,
+    reprice_on_move=True,
+    reprice_move_pct=0.3,  # Rebuild ladder if mid moves more than this %
+    volatility_pause_2pct_60s_minutes=10,
+    volatility_pause_5pct_5m_minutes=30,
+    spread_guard_threshold_pct=1.5,
+    spread_guard_duration_seconds=120,
+    spread_guard_rebuild_spread_pct=1.2,  # Temporary spread when guard triggers
+    inventory_guard_max_side_pct=65,
+    inventory_reduce_scale=0.5,  # Reduce depth by this when one side > 65%
+    anti_snipe_max_fills_in_30s=3,
+    anti_snipe_cooldown_seconds=300,
 ):
-    global SYMBOL, unfilled_iterations  # Declare global at function level
+    global SYMBOL, unfilled_iterations, _price_history, _fill_timestamps  # Declare global at function level
     
     # MAX BUY PRICE: Configurable limit (None means disabled)
     # All buy orders will be capped at this price, and any existing buy orders above this will be cancelled
@@ -83,7 +107,19 @@ def market_making(
             print(f"[REFERENCE_PRICE] {ladder_order_sizes}")
     else:
         enable_reference_price_mode = False
-    
+
+    # Adjustments mode (adjustments.md): mid-based ±1% ladder, 0.8% spread, protections
+    if enable_adjustments_mode:
+        print(f"[ADJUSTMENTS] Mode: ENABLED (mid-based ±1% ladder)")
+        print(f"[ADJUSTMENTS] Target depth per side: {target_depth_per_side} USDT | Levels per side: {levels_per_side}")
+        print(f"[ADJUSTMENTS] Best spread: {best_spread_side_pct}% each side ({best_spread_side_pct*2}% total)")
+        print(f"[ADJUSTMENTS] Refresh: {refresh_seconds_min}-{refresh_seconds_max}s + ±{refresh_random_seconds}s")
+        print(f"[ADJUSTMENTS] Reprice on move: {reprice_move_pct}% | Volatility pause: 2%/1m→{volatility_pause_2pct_60s_minutes}m, 5%/5m→{volatility_pause_5pct_5m_minutes}m")
+        print(f"[ADJUSTMENTS] Spread guard: >{spread_guard_threshold_pct}% for {spread_guard_duration_seconds}s → rebuild at {spread_guard_rebuild_spread_pct}%")
+        print(f"[ADJUSTMENTS] Inventory guard: reduce side when >{inventory_guard_max_side_pct}% | Anti-snipe: >{anti_snipe_max_fills_in_30s} fills/30s → pause {anti_snipe_cooldown_seconds}s")
+    else:
+        enable_adjustments_mode = False
+
     print("=" * 60)
     print("Market Making Bot Starting...")
     print(f"Trading Pair: {SYMBOL}")
@@ -137,6 +173,13 @@ def market_making(
         print("\n[INFO] Bot is now running. Press Ctrl+C to stop.\n")
 
         iteration = 0
+        # Adjustments mode state (persists across iterations)
+        last_ladder_mid = None
+        pause_until = 0.0  # Volatility kill-switch: no place until this timestamp
+        spread_wide_since = None  # When spread first exceeded threshold
+        cooldown_until = 0.0  # Anti-snipe: no place until this timestamp
+        use_temporary_wide_spread = False  # Spread guard: use 1.2% until next cycle
+
         while True:
             iteration += 1
             try:
@@ -214,7 +257,15 @@ def market_making(
                         continue
 
                     spread_pct = ((ask_price - bid_price) / bid_price) * 100
+                    mid_price = (bid_price + ask_price) / 2
                     print(f"[MARKET] Bid: {bid_price:.6f} | Ask: {ask_price:.6f} | Spread: {spread_pct:.3f}%")
+                    
+                    # Price history for adjustments mode (volatility kill-switch)
+                    if enable_adjustments_mode:
+                        now_ts = time.time()
+                        _price_history.append((now_ts, mid_price))
+                        while _price_history and _price_history[0][0] < now_ts - 300:
+                            _price_history.popleft()
                     
                     # SAFETY FEATURE 1: Spread validation - skip trading if spread too wide
                     # BUT: In wide spreads, we can still trade to help narrow it (market making mode)
@@ -308,6 +359,171 @@ def market_making(
                             if unfilled_iterations > 0:
                                 print(f"[ADAPTIVE] Orders filled or none exist, resetting tightening counter")
                             unfilled_iterations = 0
+                    
+                    # ---------- ADJUSTMENTS MODE (from adjustments.md) ----------
+                    if enable_adjustments_mode:
+                        now_ts = time.time()
+                        # Record fills for anti-snipe (once per iteration when any fill)
+                        if filled_buy_qty > 0 or filled_sell_qty > 0:
+                            _fill_timestamps.append(now_ts)
+                        while _fill_timestamps and _fill_timestamps[0] < now_ts - 30:
+                            _fill_timestamps.popleft()
+                        if len(_fill_timestamps) > anti_snipe_max_fills_in_30s:
+                            cooldown_until = now_ts + anti_snipe_cooldown_seconds
+                            _fill_timestamps.clear()
+                            print(f"[ADJUSTMENTS] Anti-snipe: >{anti_snipe_max_fills_in_30s} fills in 30s → cooldown {anti_snipe_cooldown_seconds}s")
+                        
+                        # Volatility kill-switch: check last 60s and 5min
+                        if len(_price_history) >= 2:
+                            recent_60 = [(t, m) for t, m in _price_history if t >= now_ts - 60]
+                            recent_300 = [(t, m) for t, m in _price_history if t >= now_ts - 300]
+                            if recent_60:
+                                mids_60 = [m for _, m in recent_60]
+                                move_60 = (max(mids_60) - min(mids_60)) / min(mids_60) if min(mids_60) > 0 else 0
+                                if move_60 >= 0.02:
+                                    pause_until = now_ts + (volatility_pause_2pct_60s_minutes * 60)
+                                    print(f"[ADJUSTMENTS] Volatility kill-switch: ≥2% move in 60s → pause {volatility_pause_2pct_60s_minutes} min")
+                            if recent_300:
+                                mids_300 = [m for _, m in recent_300]
+                                move_300 = (max(mids_300) - min(mids_300)) / min(mids_300) if min(mids_300) > 0 else 0
+                                if move_300 >= 0.05:
+                                    pause_until = now_ts + (volatility_pause_5pct_5m_minutes * 60)
+                                    print(f"[ADJUSTMENTS] Volatility kill-switch: ≥5% move in 5min → pause {volatility_pause_5pct_5m_minutes} min")
+                        
+                        # During volatility pause: cancel all, sleep, continue
+                        if now_ts < pause_until:
+                            if current_orders_number > 0:
+                                cancel_all_orders(SYMBOL)
+                                buy_order_ids.clear()
+                                sell_order_ids.clear()
+                            remaining = pause_until - now_ts
+                            sleep_adj = min(remaining, refresh_seconds_max + refresh_random_seconds)
+                            print(f"[ADJUSTMENTS] Volatility pause: sleeping {sleep_adj:.1f}s (pause for {remaining:.0f}s remaining)")
+                            time.sleep(sleep_adj)
+                            continue
+                        
+                        # Spread guard: if spread > threshold for duration, use temporary wider spread
+                        if spread_pct > spread_guard_threshold_pct:
+                            if spread_wide_since is None:
+                                spread_wide_since = now_ts
+                            elif now_ts - spread_wide_since >= spread_guard_duration_seconds:
+                                use_temporary_wide_spread = True
+                                spread_wide_since = None
+                                print(f"[ADJUSTMENTS] Spread guard: spread >{spread_guard_threshold_pct}% for {spread_guard_duration_seconds}s → rebuild at {spread_guard_rebuild_spread_pct}%")
+                        else:
+                            spread_wide_since = None
+                            use_temporary_wide_spread = False
+                        
+                        # Anti-snipe cooldown: no new orders
+                        if now_ts < cooldown_until:
+                            if current_orders_number > 0:
+                                cancel_all_orders(SYMBOL)
+                                buy_order_ids.clear()
+                                sell_order_ids.clear()
+                            sleep_adj = min(cooldown_until - now_ts, refresh_seconds_max + refresh_random_seconds)
+                            print(f"[ADJUSTMENTS] Anti-snipe cooldown: sleeping {sleep_adj:.1f}s")
+                            time.sleep(sleep_adj)
+                            continue
+                        
+                        # Inventory guard: reduce buy/sell depth when one side > 65%
+                        total_val = usdt_total + (token_total * mid_price)
+                        token_pct = (token_total * mid_price) / total_val if total_val > 0 else 0.5
+                        usdt_pct = 1.0 - token_pct
+                        buy_scale = inventory_reduce_scale if token_pct > (inventory_guard_max_side_pct / 100.0) else 1.0
+                        sell_scale = inventory_reduce_scale if usdt_pct > (inventory_guard_max_side_pct / 100.0) else 1.0
+                        if buy_scale < 1.0 or sell_scale < 1.0:
+                            print(f"[ADJUSTMENTS] Inventory guard: token {token_pct*100:.1f}% / USDT {usdt_pct*100:.1f}% → buy_scale={buy_scale}, sell_scale={sell_scale}")
+                        
+                        # Reprice on move: skip rebuild if mid moved ≤ threshold and we have orders
+                        skip_rebuild = False
+                        if reprice_on_move and last_ladder_mid is not None and current_orders_number > 0:
+                            move_pct = abs(mid_price - last_ladder_mid) / last_ladder_mid * 100 if last_ladder_mid > 0 else 100
+                            if move_pct <= reprice_move_pct:
+                                skip_rebuild = True
+                                refresh_sleep = random.uniform(refresh_seconds_min, refresh_seconds_max) + random.uniform(-refresh_random_seconds, refresh_random_seconds)
+                                refresh_sleep = max(1, refresh_sleep)
+                                print(f"[ADJUSTMENTS] Reprice on move: mid moved {move_pct:.2f}% (≤{reprice_move_pct}%) → skip rebuild, sleep {refresh_sleep:.1f}s")
+                                time.sleep(refresh_sleep)
+                                continue
+                        
+                        # Cancel all before rebuilding ladder
+                        if current_orders_number > 0:
+                            cancel_all_orders(SYMBOL)
+                            buy_order_ids.clear()
+                            sell_order_ids.clear()
+                        
+                        # Build ±1% ladder from mid (adjustments.md)
+                        low_bound = mid_price * 0.99
+                        high_bound = mid_price * 1.01
+                        if use_temporary_wide_spread:
+                            half_spread = (spread_guard_rebuild_spread_pct / 100.0) / 2
+                            best_bid_adj = mid_price * (1 - half_spread)
+                            best_ask_adj = mid_price * (1 + half_spread)
+                            use_temporary_wide_spread = False  # Reset after one cycle
+                        else:
+                            best_bid_adj = mid_price * (1 - best_spread_side_pct / 100.0)
+                            best_ask_adj = mid_price * (1 + best_spread_side_pct / 100.0)
+                        
+                        # 10 buy levels from best_bid down to low_bound, 10 sell from best_ask up to high_bound
+                        buy_prices_adj = []
+                        for i in range(levels_per_side):
+                            progress = i / (levels_per_side - 1) if levels_per_side > 1 else 0
+                            p = best_bid_adj - (best_bid_adj - low_bound) * progress
+                            buy_prices_adj.append(round(p, 5))
+                        sell_prices_adj = []
+                        for i in range(levels_per_side):
+                            progress = i / (levels_per_side - 1) if levels_per_side > 1 else 0
+                            p = best_ask_adj + (high_bound - best_ask_adj) * progress
+                            sell_prices_adj.append(round(p, 5))
+                        
+                        depth_per_level_buy_usdt = (target_depth_per_side * buy_scale) / levels_per_side
+                        depth_per_level_sell_usdt = (target_depth_per_side * sell_scale) / levels_per_side
+                        min_tokens_per_order = 10.0  # adjustments.md: ≥ 10 ACCES
+                        buy_sizes_adj = [max(min_tokens_per_order, depth_per_level_buy_usdt / p) for p in buy_prices_adj]
+                        sell_sizes_adj = [max(min_tokens_per_order, depth_per_level_sell_usdt / p) for p in sell_prices_adj]
+                        
+                        # Balance check: scale down if needed
+                        balance_adj = fetch_account_balance()
+                        avail_usdt = balance_adj["usdt"]["free"]
+                        avail_tok = balance_adj[token_symbol]["free"]
+                        total_buy_val = sum(s * p for s, p in zip(buy_sizes_adj, buy_prices_adj))
+                        total_sell_val = sum(s * p for s, p in zip(sell_sizes_adj, sell_prices_adj))
+                        if total_buy_val > avail_usdt * 0.95:
+                            scale_b = (avail_usdt * 0.95) / total_buy_val
+                            buy_sizes_adj = [s * scale_b for s in buy_sizes_adj]
+                        if total_sell_val > avail_tok * best_ask_adj * 0.95:
+                            scale_s = (avail_tok * best_ask_adj * 0.95) / total_sell_val
+                            sell_sizes_adj = [s * scale_s for s in sell_sizes_adj]
+                        
+                        # Filter: min 10 tokens and min order value 10 USDT
+                        MIN_ORDER_VALUE_ADJ = 10.0
+                        filtered_buy_adj = [(i, s, p) for i, (s, p) in enumerate(zip(buy_sizes_adj, buy_prices_adj)) if s >= min_tokens_per_order and s * p >= MIN_ORDER_VALUE_ADJ]
+                        filtered_sell_adj = [(i, s, p) for i, (s, p) in enumerate(zip(sell_sizes_adj, sell_prices_adj)) if s >= min_tokens_per_order and s * p >= MIN_ORDER_VALUE_ADJ]
+                        
+                        placed_buy = 0
+                        placed_sell = 0
+                        for i, size, price in filtered_buy_adj:
+                            res = place_order(SYMBOL, "buy_maker", size, price)
+                            if res and (res.get("result") == "true" or res.get("result") is True or res.get("msg") == "Success"):
+                                oid = res.get("data", {}).get("orderId") or res.get("data", {}).get("order_id")
+                                if oid:
+                                    buy_order_ids.append(oid)
+                                    placed_buy += 1
+                        for i, size, price in filtered_sell_adj:
+                            res = place_order(SYMBOL, "sell_maker", size, price)
+                            if res and (res.get("result") == "true" or res.get("result") is True or res.get("msg") == "Success"):
+                                oid = res.get("data", {}).get("orderId") or res.get("data", {}).get("order_id")
+                                if oid:
+                                    sell_order_ids.append(oid)
+                                    placed_sell += 1
+                        
+                        last_ladder_mid = mid_price
+                        print(f"[ADJUSTMENTS] Placed {placed_buy} buy, {placed_sell} sell | Total active: {len(buy_order_ids) + len(sell_order_ids)}")
+                        refresh_sleep = random.uniform(refresh_seconds_min, refresh_seconds_max) + random.uniform(-refresh_random_seconds, refresh_random_seconds)
+                        refresh_sleep = max(1, refresh_sleep)
+                        print(f"[ADJUSTMENTS] Sleeping {refresh_sleep:.1f}s before next iteration")
+                        time.sleep(refresh_sleep)
+                        continue
                     
                     # Always cancel all orders to start fresh each iteration
                     # This prevents order accumulation and ensures clean state
@@ -840,7 +1056,8 @@ def market_making(
                     print(f"[CALC] Available: {available_usdt:.2f} USDT, {available_tokens:.2f} {token_symbol.upper()}")
                     print(f"[CALC] Total Buy Orders: {sum(buy_order_sizes):.2f} {token_symbol.upper()} (~{total_buy_value:.2f} USDT)")
                     print(f"[CALC] Total Sell Orders: {sum(sell_order_sizes):.2f} {token_symbol.upper()} (~{total_sell_value:.2f} USDT)")
-                    print(f"[CALC] Total Exposure: {total_exposure:.2f} USDT ({total_exposure/current_total_balance_usdt*100:.1f}% of balance)")
+                    exposure_pct_str = f"{total_exposure/current_total_balance_usdt*100:.1f}%" if current_total_balance_usdt > 0 else "N/A"
+                    print(f"[CALC] Total Exposure: {total_exposure:.2f} USDT ({exposure_pct_str} of balance)")
                     
                     # Final validation: ensure we're not trying to spend more than available
                     if total_buy_value > available_usdt * 0.95:
